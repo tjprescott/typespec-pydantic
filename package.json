@@ -1,0 +1,22 @@
+{
+  "name": "typespec-pydantic",
+  "version": "1.0.0-beta.1",
+  "description": "Pydantic emitter for TypeSpec",
+  "main": "dist/index.js",
+  "tspMain": "lib/main.tsp",
+  "directories": {
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Microsoft Corporation",
+  "license": "ISC",
+  "type": "module",
+  "peerDependencies": {
+    "@typespec/compiler": "^0.50.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.2"
+  }
+}
