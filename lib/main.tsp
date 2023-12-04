@@ -1,1 +1,3 @@
-import "../dist/index.js";
+import "../dist/src/index.js";
+
+namespace Pydantic;

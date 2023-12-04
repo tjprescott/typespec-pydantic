@@ -1,22 +1,49 @@
 {
   "name": "typespec-pydantic",
   "version": "1.0.0-beta.1",
-  "description": "Pydantic emitter for TypeSpec",
-  "main": "dist/index.js",
-  "tspMain": "lib/main.tsp",
-  "directories": {
-    "lib": "lib"
-  },
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "author": "Microsoft Corporation",
-  "license": "ISC",
+  "description": "Pydantic emitter for TypeSpec",
+  "homepage": "https://github.com/tjprescott/typespec-pydantic",
+  "readme": "https://github.com/tjprescott/typespec-pydantic/blob/master/README.md",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tjprescott/typespec-pydantic.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tjprescott/typespec-pydantic/issues"
+  },
+  "keywords": [
+    "typespec",
+    "python"
+  ],
   "type": "module",
+  "main": "dist/src/index.js",
+  "exports": {
+    ".": {
+      "default": "./dist/src/index.js",
+      "types": "./dist/src/index.d.ts"
+    },
+    "./testing": {
+      "default": "./dist/src/testing/index.js",
+      "types": "./dist/src/testing/index.d.ts"
+    }
+  },
+  "tspMain": "lib/main.tsp",
+  "scripts": {
+    "clean": "rimraf ./dist ./temp",
+    "build": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "test": "mocha"
+  },
   "peerDependencies": {
     "@typespec/compiler": "^0.50.0"
   },
   "devDependencies": {
+    "@types/mocha": "~10.0.1",
+    "@types/node": "~18.11.9",
+    "mocha": "~10.2.0",
+    "source-map-support": "^0.5.21",
     "typescript": "^5.3.2"
   }
 }
