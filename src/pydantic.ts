@@ -1,5 +1,5 @@
-import { BooleanLiteral, EmitContext, Enum, EnumMember, Interface, IntrinsicType, Model, ModelProperty, NumericLiteral, Operation, Program, Scalar, StringLiteral, Tuple, Type, Union, UnionVariant } from "@typespec/compiler";
-import { CodeTypeEmitter, Context, Declaration, EmitEntity, EmittedSourceFile, EmitterOutput, Scope, SourceFile, StringBuilder, code } from "@typespec/compiler/emitter-framework";
+import { BooleanLiteral, EmitContext, Enum, EnumMember, Interface, IntrinsicType, Model, ModelProperty, NumericLiteral, Operation, Program, Scalar, StringLiteral, Tuple, Type, Union, UnionVariant, isIntrinsicType } from "@typespec/compiler";
+import { CodeTypeEmitter, Context, EmittedSourceFile, EmitterOutput, SourceFile, StringBuilder, code } from "@typespec/compiler/emitter-framework";
 import { PydanticEmitterOptions } from "./lib.js";
 
 export async function $onEmit(context: EmitContext<PydanticEmitterOptions>) {
@@ -13,7 +13,12 @@ export async function $onEmit(context: EmitContext<PydanticEmitterOptions>) {
 class PydanticEmitter extends CodeTypeEmitter {
 
     static readonly PYTHON_INDENT = "    ";
-    static readonly PYDANTIC_HEADER = `from pydantic import *\nfrom typing import *`;
+    // TODO: Imports should be handled dynamically
+    static readonly PYDANTIC_HEADER = `from pydantic import *\nfrom typing import *\nfrom datetime import datetime\n`;
+
+    #isLiteral(type: Type): boolean {
+        return !["Scalar", "Enum", "Union", "Model", "Tuple"].includes(type.kind);
+    }
 
     programContext(program: Program): Context {
         const options = this.emitter.getOptions();
@@ -48,7 +53,12 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
 
     modelInstantiation(model: Model, name: string | undefined): EmitterOutput<string> {
-        throw new Error("Method not implemented.");
+        if (model.name === "Record") {
+            const type = model.templateMapper?.args[0];
+            return code`Dict[str, ${type ? this.emitter.emitTypeReference(type) : "None"}]`;
+        } else {
+            throw new Error(`Unsupported model: ${model.name}`);
+        }
     }
 
     modelProperties(model: Model): EmitterOutput<string> {
@@ -60,7 +70,20 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
 
     modelPropertyLiteral(property: ModelProperty): EmitterOutput<string> {
-        return code`${property.name}: ${this.emitter.emitTypeReference(property.type)}`;
+        const builder = new StringBuilder();
+        const type = this.emitter.emitTypeReference(property.type);
+        const isLiteral = this.#isLiteral(property.type);
+        if (isLiteral) {
+            builder.push(code`${property.name}: Literal[${type}`);
+        } else {
+            builder.push(code`${property.name}: ${type}`);
+        }
+        if (property.optional)
+            builder.push(code` | None`);
+        if (isLiteral) {
+            builder.push(code`]`);
+        }
+        return builder.reduce();
     }
 
     modelPropertyReference(property: ModelProperty): EmitterOutput<string> {
@@ -88,15 +111,16 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
 
     booleanLiteral(boolean: BooleanLiteral): EmitterOutput<string> {
-        throw new Error("Method not implemented.");
+        const val = boolean.value.toString();
+        return code`${val.charAt(0).toUpperCase()}${val.slice(1)}`;
     }
 
     numericLiteral(number: NumericLiteral): EmitterOutput<string> {
-        throw new Error("Method not implemented.");
+        return code`${number.value.toString()}`;
     }
 
     stringLiteral(string: StringLiteral): EmitterOutput<string> {
-        throw new Error("Method not implemented.");
+        return code`"${string.value}"`;
     }
 
     intrinsic(intrinsic: IntrinsicType, name: string): EmitterOutput<string> {
@@ -105,12 +129,16 @@ class PydanticEmitter extends CodeTypeEmitter {
 
     scalarDeclaration(scalar: Scalar, name: string): EmitterOutput<string> {
         switch (scalar.name) {
+            case "boolean":
+                return "bool";
             case "string":
                 return "str";
             case "int16":
             case "int32":
             case "int64":
                 return "int"
+            case "utcDateTime":
+                return "datetime";
             default:
                 return code`${scalar.name}`;
         }
@@ -160,10 +188,25 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
 
     unionLiteral(union: Union): EmitterOutput<string> {
-        throw new Error("Method not implemented.");
+        const builder = new StringBuilder();
+        let i = 0;
+        const uniqueTypes = [...new Set([...union.variants.values()].map(v => v.type))];
+        const uniqueValues = [...new Set([...union.variants.values()].map(v => code`${this.emitter.emitTypeReference(v.type)}`))];
+        const length = uniqueValues.length;
+        // check if all uniqueTypes pass #isLiteral
+        const isLiteral = uniqueTypes.every(t => this.#isLiteral(t));
+        builder.push(code`${isLiteral ? "Literal[" : "Union["}`);
+        for (const val of uniqueValues) {
+            builder.push(val);
+            if (++i < length)
+                builder.push(code`, `);
+            else
+                builder.push(code`]`);
+        }
+        return builder.reduce();
     }
 
     unionVariant(variant: UnionVariant): EmitterOutput<string> {
-        throw new Error("Method not implemented.");
+        return code`${this.emitter.emitTypeReference(variant.type)}`;
     }
 }
