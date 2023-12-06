@@ -107,6 +107,10 @@ class PydanticEmitter extends CodeTypeEmitter {
         switch (scalar.name) {
             case "string":
                 return "str";
+            case "int16":
+            case "int32":
+            case "int64":
+                return "int"
             default:
                 return code`${scalar.name}`;
         }
@@ -133,7 +137,18 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
 
     tupleLiteral(tuple: Tuple): EmitterOutput<string> {
-        throw new Error("Method not implemented.");
+        const builder = new StringBuilder();
+        let i = 0;
+        const length = tuple.values.length;
+        builder.push(code`Tuple[`);
+        for (const item of tuple.values) {
+            builder.push(code`${this.emitter.emitTypeReference(item)}`);
+            if (++i < length)
+                builder.push(code`, `);
+            else
+                builder.push(code`]`);
+        }
+        return builder.reduce();
     }
 
     unionDeclaration(union: Union, name: string): EmitterOutput<string> {

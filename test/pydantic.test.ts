@@ -45,6 +45,23 @@ describe("Pydantic", () => {
         compare(expect, result, 3);
     });
 
+    it("supports tuples", async () => {
+        const input = `
+        @test
+        namespace WidgetManager;
+
+        model Widget {
+            parts: [string, int16];
+        }`;
+
+        const expect = `
+        class Widget(BaseModel):
+            parts: Tuple[str, int]
+        `;
+        const result = await pydanticOutputFor(input);
+        compare(expect, result, 3);
+    });
+
     it("supports class references", async () => {
         const input = `
         @test
