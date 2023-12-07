@@ -329,7 +329,36 @@ describe("Pydantic", () => {
             const [result, diagnostics] = await pydanticOutputFor(input);
             expectDiagnosticEmpty(diagnostics);
             compare(expect, result, startLine);
-        });    
+        });
+
+        it("supports enum member references", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            enum WidgetShape {
+                cube,
+                circle: "Sphere",
+            }
+
+            model Widget {
+                cube: WidgetShape.cube;
+                circle: WidgetShape.circle;
+            }
+            `;
+            const expect = `
+            class Widget(BaseModel):
+                cube: Literal[WidgetShape.CUBE]
+                circle: Literal[WidgetShape.CIRCLE]
+
+            class WidgetShape(Enum):
+                CUBE = "cube"
+                CIRCLE = "Sphere"
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
     });
  
     describe("unions", () => {

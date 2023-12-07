@@ -149,7 +149,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
 
     enumMemberReference(member: EnumMember): EmitterOutput<string> {
-        throw new Error("Method not implemented.");
+        return code`Literal[${member.enum.name}.${this.#toSnakeCase(member.name).toUpperCase()}]`;
     }
 
     arrayDeclaration(array: Model, name: string, elementType: Type): EmitterOutput<string> {
