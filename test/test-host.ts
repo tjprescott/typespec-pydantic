@@ -2,6 +2,7 @@ import { createTestHost, createTestWrapper, expectDiagnosticEmpty, resolveVirtua
 import { PydanticTestLibrary } from "../src/testing/index.js";
 import { PydanticEmitterOptions } from "../src/lib.js";
 import { strictEqual } from "assert";
+import { Diagnostic } from "@typespec/compiler";
 
 export async function createPydanticTestHost() {
     return createTestHost({
@@ -19,16 +20,16 @@ export async function createPydanticTestRunner() {
     });
 }
 
-export async function pydanticOutputFor(code: string): Promise<string[]> {
+export async function pydanticOutputFor(code: string): Promise<[string[], readonly Diagnostic[]]> {
     const runner = await createPydanticTestRunner();
     const outPath = resolveVirtualPath("/test.py");
-    await runner.compile(code, {
+    const [compiled, diagnostics] = await runner.compileAndDiagnose(code, {
         noEmit: false,
         emitters: { "typespec-pydantic": { "output-file": outPath } },
         miscOptions: { "disable-linter": true },
     });
-    const rawText = runner.fs.get(outPath)!;
-    return rawText.split("\n");
+    const rawText = runner.fs.get(outPath);
+    return [rawText ? rawText.split("\n") : [], diagnostics];
 }
 
 function getIndent(lines: string[]): number {

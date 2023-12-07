@@ -1,185 +1,404 @@
-import { BasicTestRunner } from "@typespec/compiler/testing";
+import { BasicTestRunner, expectDiagnosticEmpty, expectDiagnostics } from "@typespec/compiler/testing";
 import { compare, createPydanticTestRunner, pydanticOutputFor } from "./test-host.js";
 import { ok } from "assert";
 
 describe("Pydantic", () => {
     let runner: BasicTestRunner;
+    let startLine = 6;
 
     beforeEach(async () => {
         runner = await createPydanticTestRunner();
     });
 
-    it("supports simple schema", async () => {
-        const input = `
-        @test
-        namespace WidgetManager;
+    describe("models", () => {
+        it("supports simple properties", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget {
+                name: string;
+                price: float;
+                action: boolean;
+                created: utcDateTime;
+            }`;
+    
+            const expect = `
+            class Widget(BaseModel):
+                name: str
+                price: float
+                action: bool
+                created: datetime
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
 
-        model Widget {
-            name: string;
-            price: float;
-            action: boolean;
-        }`;
+        it("supports literal properties", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget {
+                name: "widget";
+                price: 15.50;
+                action: true;
+            }`;
+    
+            const expect = `
+            class Widget(BaseModel):
+                name: Literal["widget"]
+                price: Literal[15.5]
+                action: Literal[True]
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
 
-        const expect = `
-        class Widget(BaseModel):
-            name: str
-            price: float
-            action: bool
-        `;
-        const result = await pydanticOutputFor(input);
-        compare(expect, result, 3);
+        it("supports array properties", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget {
+                parts: string[];
+            }`;
+    
+            const expect = `
+            class Widget(BaseModel):
+                parts: List[str]
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
+        it("supports tuple properties", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget {
+                parts: [string, int16, float[]];
+            }`;
+    
+            const expect = `
+            class Widget(BaseModel):
+                parts: Tuple[str, int, List[float]]
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
+        it("supports class reference properties", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget {
+                part: WidgetPart;
+                parts: WidgetPart[];
+            }
+            
+            model WidgetPart {
+                name: string;
+            }
+            `;
+            const expect = `
+            class WidgetPart(BaseModel):
+                name: str
+    
+            class Widget(BaseModel):
+                part: WidgetPart
+                parts: List[WidgetPart]
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
+        it("supports dict properties", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget {
+                properties: Record<string>;
+            }
+            `;
+            const expect = `
+            class Widget(BaseModel):
+                properties: Dict[str, str]
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
+        it("emits warning and object for anonymous model properties", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget {
+                widgetPart: {
+                    name: string;
+                }
+            }
+            `;
+            const expect = `
+            class Widget(BaseModel):
+                widget_part: object
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnostics(diagnostics, [{
+                code: "typespec-pydantic/anonymous-model",
+            }]);
+            compare(expect, result, startLine);
+        });
+
+        it("converts camelCase properties to snake_case", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget {
+                someWeirdCasing: string;
+            }
+            `;
+            const expect = `
+            class Widget(BaseModel):
+                some_weird_casing: str
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
+        it("supports optional properties", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget {
+                name?: string;
+            }
+            `;
+            const expect = `
+            class Widget(BaseModel):
+                name: Optional[str]
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
+        it("supports named template instantiations", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget<T> {
+                contents: T;
+            }
+    
+            model StringWidget is Widget<string>;
+            `;
+            const expect = `
+            class StringWidget(BaseModel):
+                contents: str
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
+        it("emits warning for unnamed template instantiations", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget<T> {
+                contents: T;
+            }
+    
+            model WidgetPart {
+                widget: Widget<string>;
+            };
+            `;
+            const expect = `
+            class WidgetPart(BaseModel):
+                widget: Widget
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnostics(diagnostics, [{
+                code: "typespec-pydantic/template-instantiation",
+            }]);
+            compare(expect, result, startLine);
+        });    
     });
 
-    it("supports literals", async () => {
-        const input = `
-        @test
-        namespace WidgetManager;
 
-        model Widget {
-            name: "widget";
-            price: 15.50;
-            action: true;
-        }`;
-
-        const expect = `
-        class Widget(BaseModel):
-            name: Literal["widget"]
-            price: Literal[15.5]
-            action: Literal[True]
-        `;
-        const result = await pydanticOutputFor(input);
-        compare(expect, result, 3);
+    describe("operations", () => {
+        it("ignores operations", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget {
+                name: string
+            }
+    
+            op getWidget(name: string): Widget;
+            `;
+            const expect = `
+            class Widget(BaseModel):
+                name: str
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });    
     });
 
-    it("supports arrays", async () => {
-        const input = `
-        @test
-        namespace WidgetManager;
-
-        model Widget {
-            parts: string[];
-        }`;
-
-        const expect = `
-        class Widget(BaseModel):
-            parts: List[str]
-        `;
-        const result = await pydanticOutputFor(input);
-        compare(expect, result, 3);
+    describe("interfaces", () => {
+        it("ignores interfaces", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget {
+                name: string
+            }
+    
+            interface WidgetOperations {
+                getWidget(name: string): Widget;
+            }
+            `;
+            const expect = `
+            class Widget(BaseModel):
+                name: str
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });    
     });
 
-    it("supports tuples", async () => {
-        const input = `
-        @test
-        namespace WidgetManager;
+    describe("enums", () => {
+        it("supports enum declarations", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            enum WidgetShape {
+                cube,
+                sphere,
+                pyramid
+            }
 
-        model Widget {
-            parts: [string, int16, float[]];
-        }`;
+            enum WidgetColor {
+                red: "Red",
+                green: "Green",
+                blue: "Blue",
+            }
 
-        const expect = `
-        class Widget(BaseModel):
-            parts: Tuple[str, int, List[float]]
-        `;
-        const result = await pydanticOutputFor(input);
-        compare(expect, result, 3);
+            model Widget {
+                shape?: WidgetShape;
+                color?: WidgetColor;
+            }
+            `;
+            const expect = `
+            class WidgetShape(Enum):
+                CUBE = "cube"
+                SPHERE = "sphere"
+                PYRAMID = "pyramid"
+
+            class WidgetColor(Enum):
+                RED = "Red"
+                GREEN = "Green"
+                BLUE = "Blue"
+
+            class Widget(BaseModel):
+                shape: Optional[WidgetShape]
+                color: Optional[WidgetColor]
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });    
     });
+ 
+    describe("unions", () => {
+        it("supports union literals as properties", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget {
+                color: "red" | "green" | "blue";
+                count: 1 | 2 | 3;
+                numbers: int16 | int32 | float;
+                mixed?: "moo" | int16;
+            }
+            `;
+            const expect = `
+            class Widget(BaseModel):
+                color: Literal["red", "green", "blue"]
+                count: Literal[1, 2, 3]
+                numbers: Union[int, float]
+                mixed: Optional[Union[Literal["moo"], int]]
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
 
-    it("supports class references", async () => {
-        const input = `
-        @test
-        namespace WidgetManager;
+        it("supports union declarations as properties", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            union UnionOfTypes {
+                integer: int16,
+                string,
+                bool: boolean,
+            }
 
-        model Widget {
-            part: WidgetPart;
-            parts: WidgetPart[];
-        }
-        
-        model WidgetPart {
-            name: string;
-        }
-        `;
-        const expect = `
-        class WidgetPart(BaseModel):
-            name: str
+            union UnionOfLiterals {
+                1,
+                "two",
+                false,
+            }
 
-        class Widget(BaseModel):
-            part: WidgetPart
-            parts: List[WidgetPart]
-        `;
-        const result = await pydanticOutputFor(input);
-        compare(expect, result, 3);
-    });
+            union MixedUnion {
+                1,
+                2,
+                "void",
+                boolean,
+            }
 
-    it("supports datetime", async () => {
-        const input = `
-        @test
-        namespace WidgetManager;
-
-        model Widget {
-            created: utcDateTime;
-        }
-        `;
-        const expect = `
-        class Widget(BaseModel):
-            created: datetime
-        `;
-        const result = await pydanticOutputFor(input);
-        compare(expect, result, 3);
-    });
-
-    it("supports optionals", async () => {
-        const input = `
-        @test
-        namespace WidgetManager;
-
-        model Widget {
-            name?: string;
-        }
-        `;
-        const expect = `
-        class Widget(BaseModel):
-            name: str | None
-        `;
-        const result = await pydanticOutputFor(input);
-        compare(expect, result, 3);
-    });
-
-    it("supports dict", async () => {
-        const input = `
-        @test
-        namespace WidgetManager;
-
-        model Widget {
-            properties: Record<string>;
-        }
-        `;
-        const expect = `
-        class Widget(BaseModel):
-            properties: Dict[str, str]
-        `;
-        const result = await pydanticOutputFor(input);
-        compare(expect, result, 3);
-    });
-
-    it("supports unions", async () => {
-        const input = `
-        @test
-        namespace WidgetManager;
-
-        model Widget {
-            color: "red" | "green" | "blue";
-            count: 1 | 2 | 3;
-            numbers: int16 | int32 | float;
-        }
-        `;
-        const expect = `
-        class Widget(BaseModel):
-            color: Literal["red", "green", "blue"]
-            count: Literal[1, 2, 3]
-            numbers: Union[int, float]
-        `;
-        const result = await pydanticOutputFor(input);
-        compare(expect, result, 3);
+            model Widget {
+                type?: UnionOfTypes;
+                literal?: UnionOfLiterals;
+                namedReference: UnionOfTypes.bool;
+                mixed: MixedUnion;
+            }
+            `;
+    
+            const expect = `
+            class Widget(BaseModel):
+                type: Optional[Union[int, str, bool]]
+                literal: Optional[Literal[1, "two", False]]
+                named_reference: bool
+                mixed: Union[Literal[1, 2, "void"], bool]
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
     });
 });
