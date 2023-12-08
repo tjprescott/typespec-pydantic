@@ -35,6 +35,59 @@ describe("Pydantic", () => {
             compare(expect, result, startLine);
         });
 
+        it("support intrinsic types", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Foo {
+                p1: never;
+                p2: null;
+                p3: unknown;
+                p4: void;
+            }
+            `;
+    
+            const expect = `
+            class Foo(BaseModel):
+                p2: None
+                p3: object
+                p4: None
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnostics(diagnostics, {
+                code: "typespec-pydantic/intrinsic-type-unsupported",
+                message: "Intrinsic type 'never' not supported in Pydantic. Property will be omitted.",
+            });
+            compare(expect, result, startLine);
+        });
+
+        it("supports property references", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Foo {
+                prop: string;
+            }
+            
+            model Bar {
+                prop: Foo.prop;
+            }
+            `;
+    
+            const expect = `
+            class Foo(BaseModel):
+                prop: str
+
+            class Bar(BaseModel):
+                prop: str
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
         it("supports literal properties", async () => {
             const input = `
             @test
@@ -64,6 +117,48 @@ describe("Pydantic", () => {
     
             model Widget {
                 parts: string[];
+            }`;
+    
+            const expect = `
+            class Widget(BaseModel):
+                parts: List[str]
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
+        it("emits warning for array declaration", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model WidgetParts is string[];
+
+            model Widget {
+                parts: WidgetParts;
+            }`;
+    
+            const expect = `
+            class Widget(BaseModel):
+                parts: List[str]
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnostics(diagnostics, {
+                code: "typespec-pydantic/array-declaration-unsupported",
+            });
+            compare(expect, result, startLine);
+        });
+
+        it("supports array declaration aliases", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            alias WidgetParts = string[];
+
+            model Widget {
+                parts: WidgetParts;
             }`;
     
             const expect = `
@@ -238,7 +333,49 @@ describe("Pydantic", () => {
                 code: "typespec-pydantic/template-instantiation",
             }]);
             compare(expect, result, startLine);
-        });    
+        });
+
+        it("supports union instantiations", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            union SomeUnion<T> {
+                T
+            }
+    
+            model Widget {
+                widget: SomeUnion<string>;
+            };
+            `;
+            const expect = `
+            class Widget(BaseModel):
+                widget: Union[str]
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
+        it("supports scalar instantiations", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            scalar MyString<T> extends string;
+    
+            model Widget {
+                name: MyString<string>;
+            };
+            `;
+            const expect = `
+            class Widget(BaseModel):
+                name: str
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
     });
 
 

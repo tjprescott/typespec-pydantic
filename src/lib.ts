@@ -1,4 +1,4 @@
-import { JSONSchemaType, createTypeSpecLibrary } from "@typespec/compiler";
+import { JSONSchemaType, createTypeSpecLibrary, paramMessage } from "@typespec/compiler";
 
 export interface PydanticEmitterOptions {
   "output-file"?: string;
@@ -26,6 +26,25 @@ export const $lib = createTypeSpecLibrary({
       severity: "warning",
       messages: {
         default: "Template instantiation not supported. Please extract your instantiation to a named model using `is` syntax: (ex: `StringFoo is Template<string>`).",
+      }
+    },
+    "array-declaration-unsupported": {
+      severity: "warning",
+      messages: {
+        default: "Array declarations are not supported in Pydantic. Please use an alias instead.",
+      }
+    },
+    "empty-union": {
+      severity: "error",
+      messages: {
+        default: "Unions must have at least one variant.",
+      }
+    },
+    "intrinsic-type-unsupported": {
+      severity: "warning",
+      messages: {
+        default: paramMessage`Intrinsic type '${"name"}' not recognized. Assuming 'object'. Please file an issue.`,
+        never: "Intrinsic type 'never' not supported in Pydantic. Property will be omitted.",
       }
     }
   },
