@@ -59,7 +59,7 @@ class PydanticEmitter extends CodeTypeEmitter {
 
     programContext(program: Program): Context {
         const options = this.emitter.getOptions();
-        const outFile = options["output-file"] ?? "out.py";
+        const outFile = options["output-file"] ?? "models.py";
         const sourceFile = this.emitter.createSourceFile(outFile);
         return {
             scope: sourceFile.globalScope,
