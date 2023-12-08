@@ -35,6 +35,29 @@ describe("Pydantic", () => {
             compare(expect, result, startLine);
         });
 
+        it("escapes reserved keyword in names", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Foo {
+                in: string;
+                def: string;
+                class: string;
+            }
+            `;
+    
+            const expect = `
+            class Foo(BaseModel):
+                in_: str
+                def_: str
+                class_: str
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
         it("support intrinsic types", async () => {
             const input = `
             @test

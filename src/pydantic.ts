@@ -19,9 +19,16 @@ interface UnionVariantMetadata {
 
 class PydanticEmitter extends CodeTypeEmitter {
 
-    static readonly PYTHON_INDENT = "    ";
+    static readonly pythonIndent = "    ";
     // TODO: Imports should be handled dynamically
-    static readonly PYDANTIC_HEADER = `from pydantic import *\nfrom typing import *\nfrom datetime import *\nfrom decimal import *\nfrom enum import Enum`;
+    static readonly pydanticHeader = `from pydantic import *\nfrom typing import *\nfrom datetime import *\nfrom decimal import *\nfrom enum import Enum`;
+
+    static readonly reservedKeywords = [
+        "and", "as", "assert", "break", "class", "continue", "def", "del",
+        "elif", "else", "except", "False", "finally", "for", "from", "global",
+        "if", "import", "in", "is", "lambda", "None", "nonlocal", "not", "or",
+        "pass", "raise", "return", "True", "try", "while", "with", "yield"
+    ];
 
     #getBaseScalar(type: Scalar): Scalar {
         if (type.baseScalar !== undefined) {
@@ -37,6 +44,13 @@ class PydanticEmitter extends CodeTypeEmitter {
     /// Converts camelCase name to snake_case.
     #toSnakeCase(name: string): string {
         return name.replace(/([A-Z])/g, "_$1").toLowerCase();
+    }
+
+    #checkName(name: string): string {
+        if (PydanticEmitter.reservedKeywords.includes(name)) {
+            return `${name}_`;
+        }
+        return name;
     }
 
     /// Returns true if the type is an array or has a source model that is an array.
@@ -69,7 +83,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
         const emittedSourceFile: EmittedSourceFile = {
             path: sourceFile.path,
-            contents: PydanticEmitter.PYDANTIC_HEADER + "\n\n",
+            contents: PydanticEmitter.pydanticHeader + "\n\n",
         };
 
         for (const decl of sourceFile.globalScope.declarations) {
@@ -103,14 +117,14 @@ class PydanticEmitter extends CodeTypeEmitter {
                 code: "template-instantiation",
                 target: model
             });
-            return code`${model.name}`;
+            return code`${this.#checkName(model.name)}`;
         }
     }
 
     modelProperties(model: Model): EmitterOutput<string> {
         const builder = new StringBuilder();
         for (const prop of model.properties.values()) {
-            builder.push(code`${PydanticEmitter.PYTHON_INDENT}${this.emitter.emitModelProperty(prop)}\n`);
+            builder.push(code`${PydanticEmitter.pythonIndent}${this.emitter.emitModelProperty(prop)}\n`);
         }
         return this.emitter.result.rawCode(builder.reduce());
     }
@@ -124,7 +138,7 @@ class PydanticEmitter extends CodeTypeEmitter {
         if (property.type.kind === "Intrinsic" && property.type.name === "never") return code``;
 
         const isLiteral = this.#isLiteral(property.type);
-        builder.push(code`${this.#toSnakeCase(property.name)}: `);
+        builder.push(code`${this.#toSnakeCase(this.#checkName(property.name))}: `);
         if (isOptional) {
             builder.push(code`Optional[`);
         }
@@ -165,7 +179,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     enumMembers(en: Enum): EmitterOutput<string> {
         const builder = new StringBuilder();
         for (const member of en.members.values()) {
-            builder.push(code`${PydanticEmitter.PYTHON_INDENT}${this.emitter.emitType(member)}\n`);
+            builder.push(code`${PydanticEmitter.pythonIndent}${this.emitter.emitType(member)}\n`);
         }
         return this.emitter.result.rawCode(builder.reduce());
     }
@@ -173,7 +187,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     enumMember(member: EnumMember): EmitterOutput<string> {
         const builder = new StringBuilder();
         builder.push(code`${this.#toSnakeCase(member.name).toUpperCase()}`);
-        builder.push(code` = "${member.value !== undefined ? member.value.toString() : member.name}"`);
+        builder.push(code` = "${member.value !== undefined ? member.value.toString() : this.#checkName(member.name)}"`);
         return builder.reduce();
     }
 
@@ -258,7 +272,7 @@ class PydanticEmitter extends CodeTypeEmitter {
             case "utcDateTime":
                 return "datetime";
             default:
-                return code`${scalar.name}`;
+                return code`${this.#checkName(scalar.name)}`;
         }
     }
 
