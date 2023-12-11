@@ -384,7 +384,7 @@ describe("Pydantic", () => {
             compare(expect, result, startLine);
         });
 
-        it("emits warning for unnamed template instantiations", async () => {
+        it("supports template instantiations", async () => {
             const input = `
             @test
             namespace WidgetManager;
@@ -399,12 +399,40 @@ describe("Pydantic", () => {
             `;
             const expect = `
             class WidgetPart(BaseModel):
-                widget: Widget
+                widget: "WidgetString"
+
+            class WidgetString(BaseModel):
+                contents: str
             `;
             const [result, diagnostics] = await pydanticOutputFor(input);
-            expectDiagnostics(diagnostics, [{
-                code: "typespec-pydantic/template-instantiation",
-            }]);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
+        it("supports named template instantiations", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget<T> {
+                contents: T;
+            }
+    
+            model WidgetString is Widget<string>;
+
+            model WidgetPart {
+                widget: WidgetString;
+            };
+            `;
+            const expect = `
+            class WidgetString(BaseModel):
+                contents: str
+
+            class WidgetPart(BaseModel):
+                widget: WidgetString
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
             compare(expect, result, startLine);
         });
 

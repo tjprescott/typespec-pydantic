@@ -1,4 +1,4 @@
-import { BooleanLiteral, EmitContext, Enum, EnumMember, Interface, IntrinsicType, Model, ModelProperty, NumericLiteral, Operation, Program, Scalar, StringLiteral, Tuple, Type, Union, UnionVariant, isIntrinsicType } from "@typespec/compiler";
+import { BooleanLiteral, Declaration, EmitContext, Enum, EnumMember, Interface, IntrinsicType, Model, ModelProperty, NumericLiteral, Operation, Program, Scalar, StringLiteral, Tuple, Type, Union, UnionVariant, isIntrinsicType } from "@typespec/compiler";
 import { CodeTypeEmitter, Context, EmitEntity, EmittedSourceFile, EmitterOutput, SourceFile, StringBuilder, code } from "@typespec/compiler/emitter-framework";
 import { PydanticEmitterOptions, reportDiagnostic } from "./lib.js";
 import { report } from "process";
@@ -29,6 +29,10 @@ class PydanticEmitter extends CodeTypeEmitter {
         "if", "import", "in", "is", "lambda", "None", "nonlocal", "not", "or",
         "pass", "raise", "return", "True", "try", "while", "with", "yield"
     ];
+
+    private declaredType = new Set<string>();
+
+    private deferredModels = new Map<string, Model>();
 
     #indent(count: number = 1) {
         let val = "";
@@ -65,12 +69,13 @@ class PydanticEmitter extends CodeTypeEmitter {
         return name;
     }
 
-    /// Returns true if the type is an array or has a source model that is an array.
-    #isArray(type: Type): boolean {
-        if (type.kind === "Model" && type.sourceModel !== undefined) {
-            return this.#isArray(type.sourceModel);
-        }
-        return type.kind === "Model" && type.name === "Array";
+    #isDeclared(name: string): boolean {
+        return this.declaredType.has(name)
+    }
+
+    #declare(name: string, value: string | StringBuilder | undefined) {
+        this.declaredType.add(name);
+        return this.emitter.result.declaration(name, value ?? "");
     }
 
     programContext(program: Program): Context {
@@ -92,13 +97,19 @@ class PydanticEmitter extends CodeTypeEmitter {
             emittedSourceFile.contents += decl.value + "\n\n";
         }
 
+        for (const [name, model] of this.deferredModels) {
+            const props = this.emitter.emitModelProperties(model);
+            const modelCode = code`class ${name}(BaseModel):\n${props}`;
+            emittedSourceFile.contents += modelCode + "\n\n";
+        }
+
         return emittedSourceFile;
     }
 
     modelDeclaration(model: Model, name: string): EmitterOutput<string> {
         const props = this.emitter.emitModelProperties(model);
         const modelCode = code`class ${name}(BaseModel):\n${props}`;
-        return this.emitter.result.declaration(name, modelCode);
+        return this.#declare(name, modelCode);
     }
 
     modelLiteral(model: Model): EmitterOutput<string> {
@@ -115,11 +126,13 @@ class PydanticEmitter extends CodeTypeEmitter {
             const type = model.templateMapper?.args[0];
             return code`Dict[str, ${type ? this.emitter.emitTypeReference(type) : "None"}]`;
         } else {
-            reportDiagnostic(this.emitter.getProgram(), {
-                code: "template-instantiation",
-                target: model
-            });
-            return code`${this.#checkName(model.name)}`;
+            const modelName = this.#checkName(name ?? model.name);
+            if (this.#isDeclared(modelName)) {
+                return code`${modelName}`;
+            } else {
+                this.deferredModels.set(modelName, model);
+                return code`"${modelName}"`;
+            }
         }
     }
 
@@ -174,7 +187,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     enumDeclaration(en: Enum, name: string): EmitterOutput<string> {
         const members = this.emitter.emitEnumMembers(en);
         const enumCode = code`class ${name}(Enum):\n${members}`;
-        return this.emitter.result.declaration(name, enumCode);
+        return this.#declare(name, enumCode);
     }
 
     enumMembers(en: Enum): EmitterOutput<string> {
@@ -202,7 +215,7 @@ class PydanticEmitter extends CodeTypeEmitter {
         builder.push(code`${this.#indent()}root: List[${this.emitter.emitTypeReference(elementType)}]\n\n`);
         builder.push(code`${this.#indent()}def __iter__(self):\n${this.#indent(2)}return iter(self.root)\n\n`);
         builder.push(code`${this.#indent()}def __getitem__(self, item):\n${this.#indent(2)}return self.root[item]\n\n`);
-        return this.emitter.result.declaration(name, builder.reduce());
+        return this.#declare(name, builder.reduce());
     }
 
     arrayLiteral(array: Model, elementType: Type): EmitterOutput<string> {
@@ -323,7 +336,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
 
     unionDeclaration(union: Union, name: string): EmitterOutput<string> {
-        return this.emitter.result.declaration(name, '');
+        return this.#declare(name, undefined);
     }
 
     unionInstantiation(union: Union, name: string): EmitterOutput<string> {

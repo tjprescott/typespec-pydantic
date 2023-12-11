@@ -19,13 +19,7 @@ export const $lib = createTypeSpecLibrary({
     "anonymous-model": {
       severity: "warning",
       messages: {
-        default: "Anonymous models are not supported. Please extract your anonymous model into a named model.",
-      }
-    },
-    "template-instantiation": {
-      severity: "warning",
-      messages: {
-        default: "Template instantiation not supported. Please extract your instantiation to a named model using `is` syntax: (ex: `StringFoo is Template<string>`).",
+        default: "Anonymous models are not supported. Consider extracting your anonymous model into a named model.",
       }
     },
     "empty-union": {
