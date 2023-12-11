@@ -30,6 +30,14 @@ class PydanticEmitter extends CodeTypeEmitter {
         "pass", "raise", "return", "True", "try", "while", "with", "yield"
     ];
 
+    #indent(count: number = 1) {
+        let val = "";
+        for (let i = 0; i < count; i++) {
+            val += PydanticEmitter.pythonIndent;
+        }
+        return val;
+    }
+
     #getBaseScalar(type: Scalar): Scalar {
         if (type.baseScalar !== undefined) {
             return this.#getBaseScalar(type.baseScalar);
@@ -63,16 +71,6 @@ class PydanticEmitter extends CodeTypeEmitter {
             return this.#isArray(type.sourceModel);
         }
         return type.kind === "Model" && type.name === "Array";
-    }
-
-    #findArrayElement(model: Model): Type | undefined {
-        if (model.sourceModel !== undefined) {
-            return this.#findArrayElement(model.sourceModel);
-        }
-        if (model.name === "Array") {
-            return model.indexer!.value;
-        }
-        return undefined;
     }
 
     programContext(program: Program): Context {
@@ -128,7 +126,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     modelProperties(model: Model): EmitterOutput<string> {
         const builder = new StringBuilder();
         for (const prop of model.properties.values()) {
-            builder.push(code`${PydanticEmitter.pythonIndent}${this.emitter.emitModelProperty(prop)}\n`);
+            builder.push(code`${this.#indent()}${this.emitter.emitModelProperty(prop)}\n`);
         }
         return this.emitter.result.rawCode(builder.reduce());
     }
@@ -149,12 +147,7 @@ class PydanticEmitter extends CodeTypeEmitter {
         if (isLiteral) {
             builder.push(code`Literal[`);
         }
-        if (this.#isArray(property.type) && property.type.kind === "Model") {
-            const arrayElement = this.#findArrayElement(property.type);
-            if (arrayElement !== undefined) {
-                builder.push(code`List[${this.emitter.emitTypeReference(arrayElement)}]`);
-            }
-        } else if (property.type.kind === "Union") {
+        if (property.type.kind === "Union") {
             builder.push(code`${this.emitter.emitUnionVariants(property.type)}`);
         } else if (property.type.kind === "UnionVariant") {
             builder.push(code`${this.emitter.emitTypeReference(property.type.type)}`);
@@ -187,7 +180,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     enumMembers(en: Enum): EmitterOutput<string> {
         const builder = new StringBuilder();
         for (const member of en.members.values()) {
-            builder.push(code`${PydanticEmitter.pythonIndent}${this.emitter.emitType(member)}\n`);
+            builder.push(code`${this.#indent()}${this.emitter.emitType(member)}\n`);
         }
         return this.emitter.result.rawCode(builder.reduce());
     }
@@ -204,11 +197,12 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
 
     arrayDeclaration(array: Model, name: string, elementType: Type): EmitterOutput<string> {
-        reportDiagnostic(this.emitter.getProgram(), {
-            code: "array-declaration-unsupported",
-            target: array
-        });
-        return this.emitter.result.declaration(name, '');
+        const builder = new StringBuilder();
+        builder.push(code`class ${name}(RootModel):\n`);
+        builder.push(code`${this.#indent()}root: List[${this.emitter.emitTypeReference(elementType)}]\n\n`);
+        builder.push(code`${this.#indent()}def __iter__(self):\n${this.#indent(2)}return iter(self.root)\n\n`);
+        builder.push(code`${this.#indent()}def __getitem__(self, item):\n${this.#indent(2)}return self.root[item]\n\n`);
+        return this.emitter.result.declaration(name, builder.reduce());
     }
 
     arrayLiteral(array: Model, elementType: Type): EmitterOutput<string> {

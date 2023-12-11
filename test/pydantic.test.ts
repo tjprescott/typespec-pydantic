@@ -194,7 +194,7 @@ describe("Pydantic", () => {
             compare(expect, result, startLine);
         });
 
-        it("emits warning for array declaration", async () => {
+        it("supports array declaration as RootModel", async () => {
             const input = `
             @test
             namespace WidgetManager;
@@ -206,13 +206,20 @@ describe("Pydantic", () => {
             }`;
     
             const expect = `
+            class WidgetParts(RootModel):
+                root: List[str]
+
+                def __iter__(self):
+                    return iter(self.root)
+
+                def __getitem__(self, item):
+                    return self.root[item]
+
             class Widget(BaseModel):
-                parts: List[str]
+                parts: WidgetParts
             `;
             const [result, diagnostics] = await pydanticOutputFor(input);
-            expectDiagnostics(diagnostics, {
-                code: "typespec-pydantic/array-declaration-unsupported",
-            });
+            expectDiagnosticEmpty(diagnostics);
             compare(expect, result, startLine);
         });
 

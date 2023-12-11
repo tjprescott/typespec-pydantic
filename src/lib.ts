@@ -28,12 +28,6 @@ export const $lib = createTypeSpecLibrary({
         default: "Template instantiation not supported. Please extract your instantiation to a named model using `is` syntax: (ex: `StringFoo is Template<string>`).",
       }
     },
-    "array-declaration-unsupported": {
-      severity: "warning",
-      messages: {
-        default: "Array declarations are not supported in Pydantic. Please use an alias instead.",
-      }
-    },
     "empty-union": {
       severity: "error",
       messages: {
