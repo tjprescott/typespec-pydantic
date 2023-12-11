@@ -167,6 +167,10 @@ class PydanticEmitter extends CodeTypeEmitter {
         if (isOptional) {
             builder.push(code`]`);
         }
+        const defaultVal = property.default;
+        if (defaultVal !== undefined) {
+            builder.push(code` = ${this.emitter.emitTypeReference(defaultVal)}`);
+        }
         return builder.reduce();
     }
 

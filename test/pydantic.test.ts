@@ -77,6 +77,30 @@ describe("Pydantic", () => {
             compare(expect, result, startLine);
         });
 
+        it("supports default values", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Widget {
+                name: string = "Widget";
+                price: float = 9.99;
+                num: int16 = 1;
+                action: boolean = true;
+            }`;
+    
+            const expect = `
+            class Widget(BaseModel):
+                name: str = "Widget"
+                price: float = 9.99
+                num: int = 1
+                action: bool = True
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
         it("support intrinsic types", async () => {
             const input = `
             @test
