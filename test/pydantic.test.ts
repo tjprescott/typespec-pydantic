@@ -35,7 +35,7 @@ describe("Pydantic", () => {
             compare(expect, result, startLine);
         });
 
-        it("escapes reserved keyword in names", async () => {
+        it("transforms names that start with reserved keywords", async () => {
             const input = `
             @test
             namespace WidgetManager;
@@ -52,6 +52,25 @@ describe("Pydantic", () => {
                 in_: str
                 def_: str
                 class_: str
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
+        it("transforms names that start with numbers", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            model Foo {
+                "1": string;
+            }
+            `;
+    
+            const expect = `
+            class Foo(BaseModel):
+                _1: str
             `;
             const [result, diagnostics] = await pydanticOutputFor(input);
             expectDiagnosticEmpty(diagnostics);

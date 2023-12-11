@@ -46,9 +46,13 @@ class PydanticEmitter extends CodeTypeEmitter {
         return name.replace(/([A-Z])/g, "_$1").toLowerCase();
     }
 
+    /// Transforms names that start with numbers or are reserved keywords.
     #checkName(name: string): string {
+
         if (PydanticEmitter.reservedKeywords.includes(name)) {
             return `${name}_`;
+        } else if (name.match(/^\d/)) {
+            return `_${name}`;
         }
         return name;
     }
