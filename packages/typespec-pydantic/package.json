@@ -36,6 +36,11 @@
     "watch": "tsc -p . --watch",
     "test": "mocha"
   },
+  "files": [
+    "lib/*.tsp",
+    "dist/**",
+    "!dist/test/**"
+  ],
   "peerDependencies": {
     "@typespec/compiler": "^0.50.0"
   },

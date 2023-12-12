@@ -9,8 +9,6 @@ export const TypeSpecPlaygroundConfig = {
     "@typespec/openapi",
     "@typespec/versioning",
     "@typespec/openapi3",
-    "@typespec/json-schema",
-    "@typespec/protobuf",
   ],
   samples,
 } as const;

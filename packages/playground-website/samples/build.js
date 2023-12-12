@@ -25,12 +25,4 @@ await buildSamples_experimental(packageRoot, resolve(__dirname, "dist/samples.js
     preferredEmitter: "@typespec/openapi3",
     compilerOptions: { linterRuleSet: { extends: ["@typespec/http/all"] } },
   },
-  "Protobuf Kiosk": {
-    filename: "samples/kiosk.tsp",
-    preferredEmitter: "@typespec/protobuf",
-  },
-  "Json Schema": {
-    filename: "samples/json-schema.tsp",
-    preferredEmitter: "@typespec/json-schema",
-  },
 });

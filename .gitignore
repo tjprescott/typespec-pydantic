@@ -1,6 +1,9 @@
 # TypeSpec
 tsp-output
 
+temp/
+common/temp/**
+
 # scratch folder
 test/samples/scratch
 
