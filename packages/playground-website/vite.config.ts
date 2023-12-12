@@ -1,42 +1,22 @@
 import { definePlaygroundViteConfig } from "@typespec/playground/vite";
-import { execSync } from "child_process";
-import { visualizer } from "rollup-plugin-visualizer";
-import { defineConfig, loadEnv } from "vite";
-import { TypeSpecPlaygroundConfig } from "./src/index.js";
+import { defineConfig } from "vite";
 
-function getCommit() {
-  return execSync("git rev-parse HEAD").toString().trim();
-}
-
-function getPrNumber() {
-  // Set by Azure DevOps.
-  return process.env["SYSTEM_PULLREQUEST_PULLREQUESTNUMBER"];
-}
-
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd());
-  const useLocalLibraries = env["VITE_USE_LOCAL_LIBRARIES"] === "true";
-  const config = definePlaygroundViteConfig({
-    ...TypeSpecPlaygroundConfig,
-    links: {
-      githubIssueUrl: `https://github.com/microsoft/typespec/issues/new`,
-      documentationUrl: "https://microsoft.github.io/typespec",
+const config = defineConfig(definePlaygroundViteConfig({
+  defaultEmitter: "typespec-pydantic",
+  libraries: [
+    "@typespec/compiler",
+    "typespec-pydantic",
+  ],
+  samples: {
+    "My sample": {
+      filename: "samples/my.tsp",
+      preferredEmitter: "typespec-pydantic",
     },
-    skipBundleLibraries: !useLocalLibraries,
-  });
+  },
+  links: {
+    githubIssueUrl: `https://github.com/tjprescott/typespec-pydantic/issues`,
+    documentationUrl: `https://github.com/tjprescott/typespec-pydantic/blob/master/README.md`,
+  },
+}));
 
-  config.plugins!.push(
-    visualizer({
-      filename: "temp/stats.html",
-    }) as any
-  );
-
-  const prNumber = getPrNumber();
-  if (prNumber) {
-    config.define = {
-      __PR__: JSON.stringify(prNumber),
-      __COMMIT_HASH__: JSON.stringify(getCommit()),
-    };
-  }
-  return config;
-});
+export default config;

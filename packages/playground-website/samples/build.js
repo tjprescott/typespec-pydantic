@@ -7,22 +7,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(__dirname, "..");
 
 await buildSamples_experimental(packageRoot, resolve(__dirname, "dist/samples.js"), {
-  "API versioning": {
-    filename: "samples/versioning.tsp",
-    preferredEmitter: "@typespec/openapi3",
-  },
-  "Discriminated unions": {
-    filename: "samples/unions.tsp",
-    preferredEmitter: "@typespec/openapi3",
-  },
-  "HTTP service": {
-    filename: "samples/http.tsp",
-    preferredEmitter: "@typespec/openapi3",
-    compilerOptions: { linterRuleSet: { extends: ["@typespec/http/all"] } },
-  },
-  "REST framework": {
-    filename: "samples/rest.tsp",
-    preferredEmitter: "@typespec/openapi3",
+  "Basic": {
+    filename: "samples/my.tsp",
+    preferredEmitter: "typespec-pydantic",
     compilerOptions: { linterRuleSet: { extends: ["@typespec/http/all"] } },
   },
   "Protobuf Kiosk": {
