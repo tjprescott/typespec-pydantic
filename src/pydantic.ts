@@ -1,4 +1,4 @@
-import { BooleanLiteral, Declaration, EmitContext, Enum, EnumMember, Interface, IntrinsicType, Model, ModelProperty, NumericLiteral, Operation, Program, Scalar, StringLiteral, Tuple, Type, Union, UnionVariant, isIntrinsicType } from "@typespec/compiler";
+import { BooleanLiteral, Declaration, EmitContext, Enum, EnumMember, Interface, IntrinsicType, Model, ModelProperty, NumericLiteral, Operation, Program, Scalar, StringLiteral, Tuple, Type, Union, UnionVariant, getDoc, isIntrinsicType } from "@typespec/compiler";
 import { CodeTypeEmitter, Context, EmitEntity, EmittedSourceFile, EmitterOutput, SourceFile, StringBuilder, code } from "@typespec/compiler/emitter-framework";
 import { PydanticEmitterOptions, reportDiagnostic } from "./lib.js";
 import { report } from "process";
@@ -14,6 +14,67 @@ export async function $onEmit(context: EmitContext<PydanticEmitterOptions>) {
 interface UnionVariantMetadata {
     type: Type,
     value: string | StringBuilder,
+}
+
+/// Metadata for a Pydantic field.
+interface PydanticFieldMetadata {
+    [key: string]: string | StringBuilder | number | boolean | string[] | undefined;
+    // define a default value for a field.
+    default?: string | StringBuilder | number;
+    // define a callable that will be called to generate a default value.
+    defaultFactory?: string;
+    // whether the default value of the field should be validated. By default, it is not.
+    validateDefault?: boolean;
+    // description of the field
+    description?: string | StringBuilder;
+    // title of the field
+    title?: string;
+    // examples of the field
+    examples?: string[];
+    // extra JSON schema properties to be added to the field.
+    jsonSchemaExtra?: string;
+    // whether the field should be included in the string representation of the model.
+    repr?: boolean;
+    // define an alias for a field for both validation and serialization.
+    alias?: string;
+    // define an alias for a field for validation ONLY.
+    validationAlias?: string;
+    // define an alias for a field for serialization ONLY.
+    serializationAlias?: string;
+    // greater than
+    gt?: number;
+    // less than
+    lt?: number;
+    // greater than or equal to
+    ge?: number;
+    // less than or equal to
+    le?: number;
+    // multiple of the given number
+    multipleOf?: number;
+    // allow 'inf', '-inf' and 'nan' values.
+    allowInfNan?: boolean;
+    // minimum length of string
+    minLength?: number;
+    // maximum length of string
+    maxLength?: number;
+    // a regular expression that the string must match
+    pattern?: string;
+    // maximum number of digits within the Decimal. It does not include a zero before the decimal point or trailing decimal zeros.
+    maxDigits?: number;
+    // maximum number of decimal places allowed. It does not include trailing decimal zeroes.
+    decimalPlaces?: number;
+    // whether the field should be seen as init-only field in the dataclass.
+    initVar?: boolean;
+    // whether the field should be a keyword-only argument in the constructor of the dataclass.
+    kwOnly?: boolean;
+    // the field that will be used to discriminate between different models in a union.
+    discriminator?: string;
+    // whether the field should be validated in "strict mode".
+    strict?: boolean;
+    // prevent the field from being assigned a new value after the model is created (immutability).
+    frozen?: boolean;
+    // whether the field should be excluded from the model when exporting the model.
+    exclude?: boolean;
 }
 
 
@@ -78,6 +139,53 @@ class PydanticEmitter extends CodeTypeEmitter {
         return this.emitter.result.declaration(name, value ?? "");
     }
 
+    #emitFieldValue(value: string | StringBuilder | number | boolean | string[]): string | StringBuilder {
+        if (typeof value === "boolean") {
+            return value ? "True" : "False";
+        } else {
+            return value.toString();
+        }
+    }
+
+    #emitField(builder: StringBuilder, item: ModelProperty | EnumMember): StringBuilder {
+        const metadata: PydanticFieldMetadata = {};
+
+        // gather metadata
+        const doc = getDoc(this.emitter.getProgram(), item);
+        metadata.description = doc !== undefined ? code`"${doc}"` : undefined;
+        if (item.kind === "ModelProperty") {
+            if (item.default !== undefined) {
+                metadata.default = code`${this.emitter.emitTypeReference(item.default)}`;
+            }
+        } else if (item.kind === "EnumMember") {
+            metadata.default = item.value !== undefined ? code`"${item.value.toString()}"` : code`"${this.#checkName(item.name)}"`;
+            metadata.frozen = true;
+        }
+
+        // delete any undefined values
+        for (const [key, val] of Object.entries(metadata)) {
+            if (val === undefined) {
+                delete metadata[key];
+            }
+        }
+
+        // don't emit anything if there is no metadata
+        if (Object.keys(metadata).length === 0) return builder;
+
+        // emit metadata
+        builder.push(code` = Field(`);
+        let i = 0;
+        const length = Object.keys(metadata).length;
+        for (const [key, val] of Object.entries(metadata)) {
+            if (val === undefined) continue;
+            const pythonKey = this.#toSnakeCase(key);
+            builder.push(code`${pythonKey}=${this.#emitFieldValue(val)}`);
+            if (++i < length) builder.push(code`, `);
+        }
+        builder.push(code`)`);
+        return builder;
+    }
+
     programContext(program: Program): Context {
         const options = this.emitter.getOptions();
         const outFile = options["output-file"] ?? "models.py";
@@ -108,8 +216,14 @@ class PydanticEmitter extends CodeTypeEmitter {
 
     modelDeclaration(model: Model, name: string): EmitterOutput<string> {
         const props = this.emitter.emitModelProperties(model);
-        const modelCode = code`class ${name}(BaseModel):\n${props}`;
-        return this.#declare(name, modelCode);
+        const docs = getDoc(this.emitter.getProgram(), model);
+        const builder = new StringBuilder();
+        builder.push(code`class ${name}(BaseModel):\n`);
+        if (docs !== undefined) {
+            builder.push(code`${this.#indent()}"""${docs}"""\n`);
+        }
+        builder.push(code`${props}`);
+        return this.#declare(name, builder.reduce());
     }
 
     modelLiteral(model: Model): EmitterOutput<string> {
@@ -173,10 +287,7 @@ class PydanticEmitter extends CodeTypeEmitter {
         if (isOptional) {
             builder.push(code`]`);
         }
-        const defaultVal = property.default;
-        if (defaultVal !== undefined) {
-            builder.push(code` = ${this.emitter.emitTypeReference(defaultVal)}`);
-        }
+        this.#emitField(builder, property);
         return builder.reduce();
     }
 
@@ -186,8 +297,14 @@ class PydanticEmitter extends CodeTypeEmitter {
 
     enumDeclaration(en: Enum, name: string): EmitterOutput<string> {
         const members = this.emitter.emitEnumMembers(en);
-        const enumCode = code`class ${name}(Enum):\n${members}`;
-        return this.#declare(name, enumCode);
+        const builder = new StringBuilder();
+        const docs = getDoc(this.emitter.getProgram(), en);
+        builder.push(code`class ${name}(Enum):\n`);
+        if (docs !== undefined) {
+            builder.push(code`${this.#indent()}"""${docs}"""\n`);
+        }        
+        builder.push(code`${members}`);
+        return this.#declare(name, builder.reduce());
     }
 
     enumMembers(en: Enum): EmitterOutput<string> {
@@ -201,7 +318,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     enumMember(member: EnumMember): EmitterOutput<string> {
         const builder = new StringBuilder();
         builder.push(code`${this.#toSnakeCase(member.name).toUpperCase()}`);
-        builder.push(code` = "${member.value !== undefined ? member.value.toString() : this.#checkName(member.name)}"`);
+        this.#emitField(builder, member);
         return builder.reduce();
     }
 
@@ -223,8 +340,8 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
 
     booleanLiteral(boolean: BooleanLiteral): EmitterOutput<string> {
-        const val = boolean.value.toString();
-        return code`${val.charAt(0).toUpperCase()}${val.slice(1)}`;
+        const val = boolean.value ? "True" : "False";
+        return code`${val}`;
     }
 
     numericLiteral(number: NumericLiteral): EmitterOutput<string> {
