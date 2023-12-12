@@ -6,6 +6,9 @@ test/samples/scratch
 # scratch folder
 test/samples/scratch
 
+# scratch folder
+test/samples/scratch
+
 # Logs
 logs
 *.log
