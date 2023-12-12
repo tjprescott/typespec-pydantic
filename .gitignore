@@ -1,6 +1,9 @@
 # TypeSpec
 tsp-output
 
+# scratch folder
+test/samples/scratch
+
 # Logs
 logs
 *.log
@@ -131,3 +134,4 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
