@@ -1,0 +1,25 @@
+{
+  "extends": "../tsconfig.json",
+  "references": [
+  ],
+  "compilerOptions": {
+    "outDir": "dist-dev",
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "incremental": true,
+    "tsBuildInfoFile": "temp/tsconfig.tsbuildinfo",
+    "jsx": "react-jsx",
+    "checkJs": true,
+    "allowJs": true,
+    "lib": ["DOM", "ES2022"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "test/**/*.ts",
+    "e2e/**/*.ts",
+    "vite.config.ts",
+    "samples/**/*.js",
+    "samples/**/*.d.ts"
+  ]
+}
