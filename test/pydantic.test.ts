@@ -35,6 +35,48 @@ describe("Pydantic", () => {
             compare(expect, result, startLine);
         });
 
+        it("supports documentation with @doc", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            @doc("This is a widget.")
+            model Widget {
+                @doc("The name of the widget.")
+                name: string;
+            }`;
+    
+            const expect = `
+            class Widget(BaseModel):
+                """This is a widget."""
+                name: str = Field(description="The name of the widget.")
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
+        it("supports documentation with doc comment", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            /** This is a widget. */
+            model Widget {
+                /** The name of the widget. */
+                name: string;
+            }`;
+    
+            const expect = `
+            class Widget(BaseModel):
+                """This is a widget."""
+                name: str = Field(description="The name of the widget.")
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
         it("transforms names that start with reserved keywords", async () => {
             const input = `
             @test
@@ -91,10 +133,10 @@ describe("Pydantic", () => {
     
             const expect = `
             class Widget(BaseModel):
-                name: str = "Widget"
-                price: float = 9.99
-                num: int = 1
-                action: bool = True
+                name: str = Field(default="Widget")
+                price: float = Field(default=9.99)
+                num: int = Field(default=1)
+                action: bool = Field(default=True)
             `;
             const [result, diagnostics] = await pydanticOutputFor(input);
             expectDiagnosticEmpty(diagnostics);
@@ -551,18 +593,72 @@ describe("Pydantic", () => {
             `;
             const expect = `
             class WidgetShape(Enum):
-                CUBE = "cube"
-                SPHERE = "sphere"
-                PYRAMID = "pyramid"
+                CUBE = Field(default="cube", frozen=True)
+                SPHERE = Field(default="sphere", frozen=True)
+                PYRAMID = Field(default="pyramid", frozen=True)
 
             class WidgetColor(Enum):
-                RED = "Red"
-                GREEN = "Green"
-                BLUE = "Blue"
+                RED = Field(default="Red", frozen=True)
+                GREEN = Field(default="Green", frozen=True)
+                BLUE = Field(default="Blue", frozen=True)
 
             class Widget(BaseModel):
                 shape: Optional[WidgetShape]
                 color: Optional[WidgetColor]
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
+        it("supports documentation with @doc", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            @doc("This is a widget shape.")
+            enum WidgetShape {
+                @doc("This is a cube.")
+                cube,
+                @doc("This is a sphere.")
+                sphere,
+                @doc("This is a pyramid.")
+                pyramid
+            }`;
+    
+            const expect = `
+            class WidgetShape(Enum):
+                """This is a widget shape."""
+                CUBE = Field(description="This is a cube.", default="cube", frozen=True)
+                SPHERE = Field(description="This is a sphere.", default="sphere", frozen=True)
+                PYRAMID = Field(description="This is a pyramid.", default="pyramid", frozen=True)
+            `;
+            const [result, diagnostics] = await pydanticOutputFor(input);
+            expectDiagnosticEmpty(diagnostics);
+            compare(expect, result, startLine);
+        });
+
+        it("supports documentation with doc comments", async () => {
+            const input = `
+            @test
+            namespace WidgetManager;
+    
+            /** This is a widget shape. */
+            enum WidgetShape {
+                /** This is a cube. */
+                cube,
+                /** This is a sphere. */
+                sphere,
+                /** This is a pyramid. */
+                pyramid
+            }`;
+    
+            const expect = `
+            class WidgetShape(Enum):
+                """This is a widget shape."""
+                CUBE = Field(description="This is a cube.", default="cube", frozen=True)
+                SPHERE = Field(description="This is a sphere.", default="sphere", frozen=True)
+                PYRAMID = Field(description="This is a pyramid.", default="pyramid", frozen=True)
             `;
             const [result, diagnostics] = await pydanticOutputFor(input);
             expectDiagnosticEmpty(diagnostics);
@@ -590,8 +686,8 @@ describe("Pydantic", () => {
                 circle: Literal[WidgetShape.CIRCLE]
 
             class WidgetShape(Enum):
-                CUBE = "cube"
-                CIRCLE = "Sphere"
+                CUBE = Field(default="cube", frozen=True)
+                CIRCLE = Field(default="Sphere", frozen=True)
             `;
             const [result, diagnostics] = await pydanticOutputFor(input);
             expectDiagnosticEmpty(diagnostics);
