@@ -1,0 +1,3 @@
+model Foo {
+    name: string;
+}
