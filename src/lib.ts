@@ -20,21 +20,27 @@ export const $lib = createTypeSpecLibrary({
       severity: "warning",
       messages: {
         default: "Anonymous models are not supported. Consider extracting your anonymous model into a named model.",
-      }
+      },
     },
     "empty-union": {
       severity: "error",
       messages: {
         default: "Unions must have at least one variant.",
-      }
+      },
     },
     "intrinsic-type-unsupported": {
       severity: "warning",
       messages: {
         default: paramMessage`Intrinsic type '${"name"}' not recognized. Assuming 'object'. Please file an issue.`,
         never: "Intrinsic type 'never' not supported in Pydantic. Property will be omitted.",
-      }
-    }
+      },
+    },
+    "invalid-discriminated-union": {
+      severity: "warning",
+      messages: {
+        default: "Found conflicting discriminators in union. Ensure all variants have the same discriminator.",
+      },
+    },
   },
   emitter: {
     options: PydanticEmitterOptionsSchema,

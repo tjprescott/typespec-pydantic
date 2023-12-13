@@ -1,6 +1,5 @@
 import {
   BooleanLiteral,
-  Declaration,
   EmitContext,
   Enum,
   EnumMember,
@@ -16,7 +15,9 @@ import {
   Tuple,
   Type,
   Union,
-  UnionVariant,
+  getDiscriminatedTypes,
+  getDiscriminatedUnion,
+  getDiscriminator,
   getDoc,
   getMaxLength,
   getMaxValue,
@@ -25,7 +26,7 @@ import {
   getMinValue,
   getMinValueExclusive,
   getPattern,
-  isIntrinsicType,
+  getVisibility,
 } from "@typespec/compiler";
 import {
   CodeTypeEmitter,
@@ -211,6 +212,34 @@ class PydanticEmitter extends CodeTypeEmitter {
     return this.emitter.result.declaration(name, value ?? "");
   }
 
+  #findDiscriminator(type: Type): string | undefined {
+    if (type.kind === "Union") {
+      const variants = [...type.variants.values()];
+      const discriminators = variants.map((variant) => this.#findDiscriminator(variant.type));
+      // if all discriminators are undefined, return undefined. If all discriminator values are the same, return that value.
+      if (discriminators.every((discriminator) => discriminator === undefined)) {
+        return undefined;
+      }
+      if (discriminators.every((discriminator) => discriminator === discriminators[0])) {
+        return discriminators[0];
+      } else {
+        reportDiagnostic(this.emitter.getProgram(), {
+          code: "invalid-discriminated-union",
+          target: type,
+        });
+        return undefined;
+      }
+    } else if (type.kind === "Model") {
+      const discriminator = getDiscriminator(this.emitter.getProgram(), type);
+      if (discriminator !== undefined) {
+        return discriminator.propertyName;
+      } else if (type.baseModel !== undefined) {
+        return this.#findDiscriminator(type.baseModel);
+      }
+    }
+    return undefined;
+  }
+
   #emitFieldValue(value: string | StringBuilder | number | boolean | Type | string[]): string | StringBuilder {
     if (typeof value === "boolean") {
       return value ? "True" : "False";
@@ -242,6 +271,13 @@ class PydanticEmitter extends CodeTypeEmitter {
       metadata.default = item.value !== undefined ? item.value : this.#checkName(item.name);
       metadata.frozen = true;
     }
+
+    // check for read-only properties
+    const visibility = getVisibility(this.emitter.getProgram(), item);
+    if (visibility !== undefined && visibility.length === 1 && visibility[0] === "read") {
+      metadata.frozen = true;
+    }
+
     // gather string metadata
     metadata.minLength = getMinLength(this.emitter.getProgram(), item);
     metadata.maxLength = getMaxLength(this.emitter.getProgram(), item);
@@ -252,6 +288,14 @@ class PydanticEmitter extends CodeTypeEmitter {
     metadata.gt = getMinValueExclusive(this.emitter.getProgram(), item);
     metadata.le = getMaxValue(this.emitter.getProgram(), item);
     metadata.lt = getMaxValueExclusive(this.emitter.getProgram(), item);
+
+    // gather discriminator metadata
+    if (item.kind === "ModelProperty") {
+      const discriminator = this.#findDiscriminator(item.type);
+      metadata.discriminator = discriminator !== undefined ? discriminator : undefined;
+    } else {
+      metadata.discriminator = undefined;
+    }
 
     // TODO: unsupported metadata
     metadata.defaultFactory = undefined;
@@ -269,7 +313,6 @@ class PydanticEmitter extends CodeTypeEmitter {
     metadata.decimalPlaces = undefined;
     metadata.initVar = undefined;
     metadata.kwOnly = undefined;
-    metadata.discriminator = undefined;
     metadata.strict = undefined;
     metadata.exclude = undefined;
 
@@ -333,7 +376,11 @@ class PydanticEmitter extends CodeTypeEmitter {
     if (docs !== undefined) {
       builder.push(code`${this.#indent()}"""${docs}"""\n`);
     }
-    builder.push(code`${props}`);
+    if ([...model.properties.values()].length > 0) {
+      builder.push(code`${props}`);
+    } else {
+      builder.push(code`${this.#indent()}pass`);
+    }
     return this.#declare(name, builder.reduce());
   }
 
@@ -400,6 +447,10 @@ class PydanticEmitter extends CodeTypeEmitter {
       builder.push(code`]`);
     }
     this.#emitField(builder, property);
+    const docs = getDoc(this.emitter.getProgram(), property);
+    if (docs !== undefined) {
+      builder.push(code`\n${this.#indent()}"""${docs}"""`);
+    }
     return builder.reduce();
   }
 
@@ -431,6 +482,10 @@ class PydanticEmitter extends CodeTypeEmitter {
     const builder = new StringBuilder();
     builder.push(code`${this.#toSnakeCase(member.name).toUpperCase()}`);
     this.#emitField(builder, member);
+    const docs = getDoc(this.emitter.getProgram(), member);
+    if (docs !== undefined) {
+      builder.push(code`\n${this.#indent()}"""${docs}"""`);
+    }
     return builder.reduce();
   }
 

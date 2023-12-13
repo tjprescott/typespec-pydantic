@@ -1,23 +1,16 @@
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "type": "node",
-            "request": "launch",
-            "name": "Pydantic Emitter",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "program": "${workspaceFolder}/node_modules/@typespec/compiler/entrypoints/cli.js",
-            "args": [
-                "compile",
-                //"C:/repos/typespec-azure/packages/samples/specs/data-plane/widget-manager/main.tsp",
-                "C:/repos/typespec/packages/samples/specs/petstore/petstore.tsp",
-                "--emit=${workspaceFolder}",
-            ],
-        }
-    ]
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Emit Scratch",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/node_modules/@typespec/compiler/entrypoints/cli.js",
+      "args": ["compile", "${workspaceFolder}/test/samples/scratch/main.tsp", "--emit=${workspaceFolder}"]
+    }
+  ]
 }
