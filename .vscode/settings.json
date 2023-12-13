@@ -9,8 +9,7 @@
     "dist": true
   },
   "files.eol": "\n",
-  "prettier.prettierPath": "./node_modules/prettier/index.cjs",
-  "prettier.documentSelectors": ["**/*.tsp"],
+  "prettier.documentSelectors": ["**/*.tsp", "**.ts", "**.tsx"],
   "typespec.tsp-server.path": "${workspaceRoot}/node_modules/@typespec/compiler",
   "typescript.tsdk": "node_modules/typescript/lib"
 }
