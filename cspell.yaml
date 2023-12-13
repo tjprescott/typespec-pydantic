@@ -4,6 +4,7 @@ allowCompoundWords: true
 dictionaries:
   - node
   - typescript
+  - python
 words:
   - Pydantic
   - cadl

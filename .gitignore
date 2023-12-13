@@ -1,7 +1,8 @@
 # Custom Additions
 tsp-output
-test/samples/scratch
+packages/samples/scratch
 **/temp/
+
 
 # scratch folder
 test/samples/scratch
@@ -101,7 +102,6 @@ out
 # Nuxt.js build / generate output
 .nuxt
 dist
-**/dev-dist
 
 # Gatsby files
 .cache/

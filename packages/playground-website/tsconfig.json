@@ -1,13 +1,12 @@
 {
-  "extends": "../tsconfig.json",
-  "references": [
-  ],
+  "extends": "../../tsconfig.base.json",
+  "references": [],
   "compilerOptions": {
     "outDir": "dist-dev",
     "rootDir": ".",
     "skipLibCheck": true,
     "incremental": true,
-    "tsBuildInfoFile": "temp/tsconfig.tsbuildinfo",
+    "tsBuildInfoFile": "temp/.tsbuildinfo",
     "jsx": "react-jsx",
     "checkJs": true,
     "allowJs": true,

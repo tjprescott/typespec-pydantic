@@ -12,21 +12,18 @@
     "build": "pnpm -r run build",
     "clean": "pnpm -r run clean",
     "lint": "pnpm -r run lint",
+    "test": "pnpm -r run test",
     "format": "npm run -s prettier -- --write",
     "check-format": "npm run -s prettier -- --check",
     "check-version-mismatch": "syncpack list-mismatches",
     "fix-version-mismatch": "syncpack fix-mismatches",
-    "validate-scenarios": "pnpm -r --filter=@azure-tools/cadl-ranch-specs  run validate-scenarios",
-    "validate-mock-apis": "pnpm -r --filter=@azure-tools/cadl-ranch-specs  run validate-mock-apis",
-    "generate-scenarios-summary": "pnpm -r --filter=@azure-tools/cadl-ranch-specs  run generate-scenarios-summary",
-    "upload-manifest": "pnpm -r --filter=@azure-tools/cadl-ranch-specs  run upload-manifest",
     "prettier": "prettier --config ./.prettierrc.yaml **/*.{ts,js,cjs,mjs,json,yml,yaml,md,tsp}",
     "cspell": "cspell \"**/*.md\" \"**/*.ts\" \"**/*.tsp\"",
     "prepare-publish": "pnpm changeset version",
     "pr-prep": "pnpm validate-scenarios && pnpm validate-mock-apis && pnpm generate-scenarios-summary && pnpm format && pnpm cspell"
   },
   "engines": {
-    "node": ">=16.0.0",
+    "node": ">=18.0.0",
     "pnpm": ">=7.6.0"
   },
   "repository": {
@@ -45,11 +42,9 @@
     "cspell": "^7.3.9",
     "eslint": "^8.55.0",
     "eslint-plugin-import": "^2.29.0",
-    "jest": "^29.7.0",
     "prettier": "^3.1.1",
     "rimraf": "^5.0.5",
     "syncpack": "^11.2.1",
-    "ts-jest": "^29.1.1",
     "typescript": "^5.3.3"
   },
   "syncpack": {

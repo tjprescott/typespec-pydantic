@@ -2,4 +2,8 @@
 *                            text=auto eol=lf
 
 # Allow comments in JSON in GitHub rendering
+<<<<<<< HEAD
 *.json                       linguist-language=JSON-with-Comments
+=======
+*.json                       linguist-language=JSON-with-Comments
+>>>>>>> 1b4ddd1 (Fix tests for monorepo.)
