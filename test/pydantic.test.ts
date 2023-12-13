@@ -587,12 +587,12 @@ describe("Pydantic", () => {
             }
             `;
       const expect = `
-            class WidgetShape(Enum):
+            class WidgetShape(BaseModel, Enum):
                 CUBE = Field(default="cube", frozen=True)
                 SPHERE = Field(default="sphere", frozen=True)
                 PYRAMID = Field(default="pyramid", frozen=True)
 
-            class WidgetColor(Enum):
+            class WidgetColor(BaseModel, Enum):
                 RED = Field(default="Red", frozen=True)
                 GREEN = Field(default="Green", frozen=True)
                 BLUE = Field(default="Blue", frozen=True)
@@ -622,7 +622,7 @@ describe("Pydantic", () => {
             }`;
 
       const expect = `
-            class WidgetShape(Enum):
+            class WidgetShape(BaseModel, Enum):
                 """This is a widget shape."""
                 CUBE = Field(description="This is a cube.", default="cube", frozen=True)
                 SPHERE = Field(description="This is a sphere.", default="sphere", frozen=True)
@@ -649,7 +649,7 @@ describe("Pydantic", () => {
             }`;
 
       const expect = `
-            class WidgetShape(Enum):
+            class WidgetShape(BaseModel, Enum):
                 """This is a widget shape."""
                 CUBE = Field(description="This is a cube.", default="cube", frozen=True)
                 SPHERE = Field(description="This is a sphere.", default="sphere", frozen=True)
@@ -680,7 +680,7 @@ describe("Pydantic", () => {
                 cube: Literal[WidgetShape.CUBE]
                 circle: Literal[WidgetShape.CIRCLE]
 
-            class WidgetShape(Enum):
+            class WidgetShape(BaseModel, Enum):
                 CUBE = Field(default="cube", frozen=True)
                 CIRCLE = Field(default="Sphere", frozen=True)
             `;
