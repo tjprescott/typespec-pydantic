@@ -39,6 +39,7 @@ import {
   code,
 } from "@typespec/compiler/emitter-framework";
 import { PydanticEmitterOptions, reportDiagnostic } from "./lib.js";
+import { getFields } from "./decorators.js";
 
 export async function $onEmit(context: EmitContext<PydanticEmitterOptions>) {
   const assetEmitter = context.getAssetEmitter(PydanticEmitter);
@@ -297,12 +298,14 @@ class PydanticEmitter extends CodeTypeEmitter {
       metadata.discriminator = undefined;
     }
 
-    // TODO: unsupported metadata
+    // TODO: completely unsupported metadata
     metadata.defaultFactory = undefined;
-    metadata.validateDefault = undefined;
-    metadata.title = undefined;
     metadata.examples = undefined;
     metadata.jsonSchemaExtra = undefined;
+
+    // TODO: Supported with @field decorator
+    metadata.validateDefault = undefined;
+    metadata.title = undefined;
     metadata.repr = undefined;
     metadata.alias = undefined;
     metadata.validationAlias = undefined;
@@ -315,6 +318,13 @@ class PydanticEmitter extends CodeTypeEmitter {
     metadata.kwOnly = undefined;
     metadata.strict = undefined;
     metadata.exclude = undefined;
+
+    if (item.kind === "ModelProperty") {
+      const fields = getFields(this.emitter.getProgram(), item);
+      for (const field of fields ?? []) {
+        metadata[field.key] = field.value;
+      }
+    }
 
     // delete any undefined values
     for (const [key, val] of Object.entries(metadata)) {

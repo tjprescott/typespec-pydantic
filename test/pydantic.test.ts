@@ -776,4 +776,28 @@ describe("Pydantic", () => {
       compare(expect, result, startLine);
     });
   });
+
+  describe("decorators", () => {
+    describe("@field", () => {
+      it("can be used multiple times", async () => {
+        const input = `
+          model Widget {
+              @field("kw_only", true)
+              @field("title", "The Widget of Oz")
+              name: string;
+
+              @field("max_digits", 5)
+              @field("decimal_places", 2)
+              cost: float;
+          };`;
+        const expect = `
+          class Widget(BaseModel):
+              name: str = Field(title="The Widget of Oz", kw_only=True)
+              cost: float = Field(decimal_places=2, max_digits=5)`;
+        const [result, diagnostics] = await pydanticOutputFor(input);
+        expectDiagnosticEmpty(diagnostics);
+        compare(expect, result, startLine);
+      });
+    });
+  });
 });
