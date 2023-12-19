@@ -1,21 +1,23 @@
 import { definePlaygroundViteConfig } from "@typespec/playground/vite";
 import { defineConfig } from "vite";
 
-const config = defineConfig(
-  definePlaygroundViteConfig({
-    defaultEmitter: "typespec-pydantic",
-    libraries: ["@typespec/compiler", "typespec-pydantic"],
-    samples: {
-      "My sample": {
-        filename: "samples/basic.tsp",
-        preferredEmitter: "typespec-pydantic",
-      },
+const githubUrl = `https://github.com/tjprescott/typespec-pydantic`;
+const customConfig = definePlaygroundViteConfig({
+  defaultEmitter: "typespec-pydantic",
+  libraries: ["@typespec/compiler", "typespec-pydantic"],
+  samples: {
+    "My sample": {
+      filename: "samples/basic.tsp",
+      preferredEmitter: "typespec-pydantic",
     },
-    links: {
-      githubIssueUrl: `https://github.com/tjprescott/typespec-pydantic/issues`,
-      documentationUrl: `https://github.com/tjprescott/typespec-pydantic/blob/master/README.md`,
-    },
-  }),
-);
+  },
+  links: {
+    githubIssueUrl: `${githubUrl}/issues`,
+    documentationUrl: `${githubUrl}/blob/master/README.md`,
+  },
+});
+// old value "./" for local testing
+customConfig.base = githubUrl;
+const config = defineConfig(customConfig);
 
 export default config;
