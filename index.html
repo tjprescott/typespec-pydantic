@@ -1,0 +1,39 @@
+<!doctype html>
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TypeSpec Pydantic Playground</title>
+    
+    <script>
+      const useLocalLibrary = "%VITE_USE_LOCAL_LIBRARIES%" === "true";
+      if (!useLocalLibrary) {
+        document.currentScript.after(
+          Object.assign(document.createElement("script"), {
+            type: "importmap-shim",
+            src: "https://typespec.blob.core.windows.net/pkgs/indexes/typespec/0.49.x.json",
+          })
+        );
+      }
+    </script>
+<script type="importmap">
+{
+  "imports": {
+    "@typespec/compiler": "./libs/@typespec/compiler/index.js",
+    "@typespec/compiler/module-resolver": "./libs/@typespec/compiler/module-resolver.js",
+    "@typespec/compiler/emitter-framework": "./libs/@typespec/compiler/emitter-framework.js",
+    "typespec-pydantic": "./libs/typespec-pydantic/index.js"
+  }
+}
+</script>
+    <script type="module" crossorigin src="./assets/index-4e39857d.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/monaco-e1e04788.js">
+    <link rel="stylesheet" href="./assets/monaco-4a19c432.css">
+    <link rel="stylesheet" href="./assets/index-9fc07d36.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    
+  </body>
+</html>
