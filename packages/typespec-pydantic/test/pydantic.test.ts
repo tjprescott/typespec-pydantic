@@ -591,9 +591,9 @@ describe("Pydantic", () => {
         namespace WidgetManager;
 
         enum WidgetShape {
-            cube,
-            sphere,
-            pyramid
+            Cube,
+            Sphere,
+            Pyramid
         }
 
         enum WidgetColor {
@@ -608,9 +608,9 @@ describe("Pydantic", () => {
         }`;
       const expect = `
         class WidgetShape(BaseModel, Enum):
-            CUBE = Field(default="cube", frozen=True)
-            SPHERE = Field(default="sphere", frozen=True)
-            PYRAMID = Field(default="pyramid", frozen=True)
+            CUBE = Field(default="Cube", frozen=True)
+            SPHERE = Field(default="Sphere", frozen=True)
+            PYRAMID = Field(default="Pyramid", frozen=True)
 
         class WidgetColor(BaseModel, Enum):
             RED = Field(default="Red", frozen=True)

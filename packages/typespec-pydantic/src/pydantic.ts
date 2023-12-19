@@ -189,7 +189,11 @@ class PydanticEmitter extends CodeTypeEmitter {
 
   /// Converts camelCase name to snake_case.
   #toSnakeCase(name: string): string {
-    return name.replace(/([A-Z])/g, "_$1").toLowerCase();
+    const value = name.replace(/([A-Z])/g, "_$1").toLowerCase();
+    if (value.startsWith("_")) {
+      return value.substring(1);
+    }
+    return value;
   }
 
   /// Transforms names that start with numbers or are reserved keywords.
@@ -434,7 +438,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     if (property.type.kind === "Intrinsic" && property.type.name === "never") return code``;
 
     const isLiteral = this.#isLiteral(property.type);
-    builder.push(code`${this.#toSnakeCase(this.#checkName(property.name))}: `);
+    builder.push(code`${this.#checkName(this.#toSnakeCase(property.name))}: `);
     if (isOptional) {
       builder.push(code`Optional[`);
     }
