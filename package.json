@@ -1,63 +1,51 @@
 {
-  "name": "typespec-pydantic",
+  "name": "typespec-pydantic-monorepo",
+  "private": true,
   "version": "1.0.0-beta.1",
-  "author": "Microsoft Corporation",
-  "description": "Pydantic emitter for TypeSpec",
-  "homepage": "https://github.com/tjprescott/typespec-pydantic",
-  "readme": "https://github.com/tjprescott/typespec-pydantic/blob/master/README.md",
-  "license": "MIT",
+  "description": "Monorepo for typespec-pydantic",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "watch": "tsc --build ./tsconfig.ws.json --watch",
+    "build": "pnpm -r run build",
+    "clean": "pnpm -r run clean",
+    "lint": "pnpm -r run lint",
+    "test": "pnpm -r run test",
+    "format": "npm run -s prettier -- --write",
+    "check-format": "npm run -s prettier -- --check",
+    "check-version-mismatch": "syncpack list-mismatches",
+    "fix-version-mismatch": "syncpack fix-mismatches",
+    "prettier": "prettier --config ./.prettierrc.yaml **/*.{ts,js,cjs,mjs,json,yml,yaml,md,tsp}",
+    "cspell": "cspell \"**/*.md\" \"**/*.ts\" \"**/*.tsp\"",
+    "prepare-publish": "pnpm changeset version",
+    "pr-prep": "pnpm validate-scenarios && pnpm validate-mock-apis && pnpm generate-scenarios-summary && pnpm format && pnpm cspell"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=7.6.0"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/tjprescott/typespec-pydantic.git"
   },
+  "author": "Microsoft Corporation",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/tjprescott/typespec-pydantic/issues"
   },
-  "keywords": [
-    "typespec",
-    "python"
-  ],
-  "type": "module",
-  "main": "dist/src/index.js",
-  "exports": {
-    ".": {
-      "default": "./dist/src/index.js",
-      "types": "./dist/src/index.d.ts"
-    },
-    "./testing": {
-      "default": "./dist/src/testing/index.js",
-      "types": "./dist/src/testing/index.d.ts"
-    }
-  },
-  "tspMain": "lib/main.tsp",
-  "scripts": {
-    "clean": "rimraf ./dist ./temp",
-    "build": "tsc -p .",
-    "watch": "tsc -p . --watch",
-    "lint": "eslint . --ext .ts --max-warnings=0",
-    "format": "npm run -s prettier -- --write",
-    "check-format": "npm run -s prettier -- --check",
-    "cspell": "cspell \"**/*.md\" \"**/*.ts\" \"**/*.tsp\"",
-    "test": "mocha"
-  },
-  "peerDependencies": {
-    "@typespec/compiler": "^0.50.0"
-  },
+  "homepage": "https://github.com/tjprescott/typespec-pydantic",
   "devDependencies": {
-    "@changesets/cli": "^2.26.2",
-    "@types/mocha": "~10.0.1",
-    "@types/node": "~18.11.9",
+    "@changesets/cli": "^2.27.1",
     "@typespec/prettier-plugin-typespec": "~0.50.0",
-    "@typespec/eslint-config-typespec": "~0.7.0",
-    "cspell": "^7.3.7",
-    "eslint": "^8.50.0",
-    "eslint-plugin-import": "^2.28.1",
-    "mocha": "~10.2.0",
+    "cspell": "^7.3.9",
+    "eslint": "^8.55.0",
+    "eslint-plugin-import": "^2.29.0",
     "prettier": "^3.1.1",
     "rimraf": "^5.0.5",
-    "source-map-support": "^0.5.21",
     "syncpack": "^11.2.1",
-    "typescript": "^5.3.2"
+    "typescript": "^5.3.3"
   },
   "syncpack": {
     "dependencyTypes": [

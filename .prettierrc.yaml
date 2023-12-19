@@ -4,6 +4,8 @@ printWidth: 120
 quoteProps: "consistent"
 endOfLine: lf
 arrowParens: always
+path: "./node_modules/prettier/index.cjs"
+documentSelectors: ["**/*.tsp", "**.ts", "**.tsx"]
 plugins:
   - "./node_modules/@typespec/prettier-plugin-typespec/dist/index.js"
 overrides: [{ "files": "*.tsp", "options": { "parser": "typespec" } }]

@@ -15,8 +15,6 @@ import {
   Tuple,
   Type,
   Union,
-  getDiscriminatedTypes,
-  getDiscriminatedUnion,
   getDiscriminator,
   getDoc,
   getMaxLength,

@@ -8,8 +8,14 @@
     "**/node_modules": true,
     "dist": true
   },
+  "files.exclude": {
+    "**/*.d.ts": true
+  },
+  "mochaExplorer.files": ["./packages/*/dist/test/**/*.test.js"],
+  "mochaExplorer.mochaPath": "./packages/typespec-pydantic/node_modules/mocha",
+  "mochaExplorer.timeout": 500000,
+  "mochaExplorer.require": "source-map-support/register",
   "files.eol": "\n",
-  "prettier.documentSelectors": ["**/*.tsp", "**.ts", "**.tsx"],
-  "typespec.tsp-server.path": "${workspaceRoot}/node_modules/@typespec/compiler",
+  "typespec.tsp-server.path": "${workspaceRoot}/packages/typespec-pydantic/node_modules/@typespec/compiler",
   "typescript.tsdk": "node_modules/typescript/lib"
 }

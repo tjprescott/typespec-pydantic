@@ -1,7 +1,11 @@
 # Custom Additions
 tsp-output
-test/samples/scratch
+packages/samples/scratch
 **/temp/
+
+
+# scratch folder
+test/samples/scratch
 
 # scratch folder
 test/samples/scratch

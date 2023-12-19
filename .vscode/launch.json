@@ -10,7 +10,7 @@
       "name": "Emit Scratch",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/node_modules/@typespec/compiler/entrypoints/cli.js",
-      "args": ["compile", "${workspaceFolder}/test/samples/scratch/main.tsp", "--emit=${workspaceFolder}"]
+      "args": ["compile", "${workspaceFolder}/packages/samples/scratch/main.tsp", "--emit=${workspaceFolder}"]
     }
   ]
 }
