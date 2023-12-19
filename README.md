@@ -19,3 +19,8 @@ Install the Mocha Test Explorer for VSCode. You should be able to run all of the
 ## Running Manually
 
 There's a `launch.json` configuration you can edit to run the emitter against a spec in the `packages\samples\scratch` folder.
+
+## Emitter Playground
+
+If you just want to try the emitter, you can go the following playground:
+https://tjprescott.github.io/typespec-pydantic/
