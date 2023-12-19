@@ -1,4 +1,4 @@
-import{m as Fe}from"./monaco-e1e04788.js";/*!-----------------------------------------------------------------------------
+import{m as Fe}from"./monaco-def7ba9c.js";/*!-----------------------------------------------------------------------------
  * Copyright (c) Microsoft Corporation. All rights reserved.
  * Version: 0.43.0(94c055bcbdd49f04a0fa15515e848542a79fb948)
  * Released under the MIT license
