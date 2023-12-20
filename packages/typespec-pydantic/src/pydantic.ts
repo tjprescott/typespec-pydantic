@@ -118,6 +118,23 @@ interface PydanticFieldMetadata {
 class PydanticEmitter extends CodeTypeEmitter {
   static readonly pythonIndent = "    ";
 
+  static readonly builtInTypes = [
+    "int",
+    "float",
+    "complex",
+    "str",
+    "list",
+    "tuple",
+    "range",
+    "bytes",
+    "bytearray",
+    "memoryview",
+    "dict",
+    "bool",
+    "set",
+    "frozenset",
+  ];
+
   static readonly reservedKeywords = [
     "and",
     "as",
@@ -393,7 +410,7 @@ class PydanticEmitter extends CodeTypeEmitter {
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
     const emittedSourceFile: EmittedSourceFile = {
       path: sourceFile.path,
-      contents: this.#generateHeader() + "\n",
+      contents: this.#generateHeader() + "",
     };
 
     for (const decl of sourceFile.globalScope.declarations) {
@@ -603,11 +620,11 @@ class PydanticEmitter extends CodeTypeEmitter {
   }
 
   #convertScalarName(scalar: Scalar, name: string | undefined): string {
-    switch (name ?? scalar.name) {
+    const scalarName = name ?? scalar.name;
+    const isBuiltIn = PydanticEmitter.builtInTypes.includes(scalarName);
+    switch (scalarName) {
       case "boolean":
         return "bool";
-      case "bytes":
-        return "bytes";
       case "string":
       case "guid":
       case "url":
@@ -622,7 +639,6 @@ class PydanticEmitter extends CodeTypeEmitter {
       case "int32":
       case "int64":
         return "int";
-      case "float":
       case "float16":
       case "float32":
       case "float64":
@@ -642,7 +658,10 @@ class PydanticEmitter extends CodeTypeEmitter {
         this.#registerImport("datetime", "datetime");
         return "datetime";
       default:
-        return this.#toPascalCase(name ?? scalar.name);
+        if (isBuiltIn) {
+          return scalarName;
+        }
+        return this.#toPascalCase(scalarName);
     }
   }
 

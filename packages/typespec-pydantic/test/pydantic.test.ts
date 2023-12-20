@@ -10,6 +10,7 @@ describe("Pydantic", () => {
             price: float;
             action: boolean;
             created: utcDateTime;
+            file: bytes;
         }`;
 
       const expect = `
@@ -18,6 +19,7 @@ describe("Pydantic", () => {
             price: float
             action: bool
             created: datetime
+            file: bytes
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
