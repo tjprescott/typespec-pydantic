@@ -57,10 +57,13 @@ function trimLines(lines: string[]): string[] {
 }
 
 /** Compares an expected string to a subset of the actual output. */
-export function compare(expect: string, lines: string[], offset: number) {
+export function compare(expect: string, lines: string[], ignoreImports: boolean = true) {
   // split the input into lines and ignore leading or trailing empty lines.
   const expectedLines = trimLines(expect.split("\n"));
-  const checkLines = trimLines(lines.slice(offset));
+  let checkLines = trimLines(lines);
+  if (ignoreImports) {
+    checkLines = checkLines.filter((line) => !line.startsWith("from"));
+  }
   strictEqual(expectedLines.length, checkLines.length);
   for (let x = 0; x < checkLines.length; x++) {
     strictEqual(

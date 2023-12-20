@@ -2,8 +2,6 @@ import { expectDiagnosticEmpty, expectDiagnostics } from "@typespec/compiler/tes
 import { compare, pydanticOutputFor } from "./test-host.js";
 
 describe("Pydantic", () => {
-  const startLine = 6;
-
   describe("models", () => {
     it("supports simple properties", async () => {
       const input = `
@@ -23,7 +21,7 @@ describe("Pydantic", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports documentation with @doc", async () => {
@@ -42,7 +40,7 @@ describe("Pydantic", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports documentation with doc comment", async () => {
@@ -61,7 +59,7 @@ describe("Pydantic", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports string constraints", async () => {
@@ -79,7 +77,7 @@ describe("Pydantic", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("transforms names that start with reserved keywords", async () => {
@@ -99,7 +97,7 @@ describe("Pydantic", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("transforms names that start with numbers", async () => {
@@ -113,7 +111,7 @@ describe("Pydantic", () => {
             _1: str`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports default values", async () => {
@@ -134,7 +132,7 @@ describe("Pydantic", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports readonly values", async () => {
@@ -149,7 +147,7 @@ describe("Pydantic", () => {
             name: str = Field(default="Widget", frozen=True)`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("support intrinsic types", async () => {
@@ -172,7 +170,7 @@ describe("Pydantic", () => {
         code: "typespec-pydantic/intrinsic-type-unsupported",
         message: "Intrinsic type 'never' not supported in Pydantic. Property will be omitted.",
       });
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports property references", async () => {
@@ -194,7 +192,7 @@ describe("Pydantic", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports literal properties", async () => {
@@ -213,7 +211,7 @@ describe("Pydantic", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports array properties", async () => {
@@ -228,7 +226,7 @@ describe("Pydantic", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports array declaration as RootModel", async () => {
@@ -253,7 +251,7 @@ describe("Pydantic", () => {
             parts: WidgetParts`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports array declaration aliases", async () => {
@@ -269,7 +267,7 @@ describe("Pydantic", () => {
             parts: List[str]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports tuple properties", async () => {
@@ -283,7 +281,7 @@ describe("Pydantic", () => {
             parts: Tuple[str, int, List[float]]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports class reference properties", async () => {
@@ -305,7 +303,7 @@ describe("Pydantic", () => {
             parts: List[WidgetPart]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports dict properties", async () => {
@@ -318,7 +316,7 @@ describe("Pydantic", () => {
             properties: Dict[str, str]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("emits warning and object for anonymous model properties", async () => {
@@ -337,7 +335,7 @@ describe("Pydantic", () => {
           code: "typespec-pydantic/anonymous-model",
         },
       ]);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("converts camelCase properties to snake_case", async () => {
@@ -350,7 +348,7 @@ describe("Pydantic", () => {
             some_weird_casing: str`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports optional properties", async () => {
@@ -363,7 +361,7 @@ describe("Pydantic", () => {
             name: Optional[str]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports named template instantiations", async () => {
@@ -378,7 +376,7 @@ describe("Pydantic", () => {
             contents: str`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports anonymous template instantiations", async () => {
@@ -398,7 +396,7 @@ describe("Pydantic", () => {
             contents: str`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports union instantiations", async () => {
@@ -415,7 +413,7 @@ describe("Pydantic", () => {
             widget: Union[str]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports discriminated unions", async () => {
@@ -452,7 +450,7 @@ describe("Pydantic", () => {
             shape: Union[Circle, Square] = Field(discriminator="kind")`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports extends relationship", async () => {
@@ -489,7 +487,7 @@ describe("Pydantic", () => {
             shape: Shape = Field(discriminator="kind")`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
   });
 
@@ -506,7 +504,7 @@ describe("Pydantic", () => {
             name: str`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
   });
 
@@ -525,7 +523,7 @@ describe("Pydantic", () => {
             name: str`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
   });
 
@@ -564,7 +562,7 @@ describe("Pydantic", () => {
             color: Optional[WidgetColor]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports documentation with @doc", async () => {
@@ -590,7 +588,7 @@ describe("Pydantic", () => {
             """This is a pyramid."""`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports documentation with doc comments", async () => {
@@ -616,7 +614,7 @@ describe("Pydantic", () => {
             """This is a pyramid."""`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports enum member references", async () => {
@@ -640,7 +638,7 @@ describe("Pydantic", () => {
             CIRCLE = Field(default="Sphere", frozen=True)`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
   });
 
@@ -661,7 +659,7 @@ describe("Pydantic", () => {
             mixed: Optional[Union[Literal["moo"], int]]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports union declarations as properties", async () => {
@@ -700,7 +698,7 @@ describe("Pydantic", () => {
             mixed: Union[Literal[1, 2, "void"], bool]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
   });
 
@@ -719,7 +717,7 @@ describe("Pydantic", () => {
         MyStringString = Annotated[str, Field()]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
+      compare(expect, result);
     });
 
     it("supports scalar declarations", async () => {
@@ -738,7 +736,7 @@ describe("Pydantic", () => {
             name: MyString`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, 6);
+      compare(expect, result);
     });
 
     it("translates TypeSpec scalars to Python types", async () => {
@@ -763,7 +761,7 @@ describe("Pydantic", () => {
             date_time: datetime`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, 6);
+      compare(expect, result);
     });
 
     it("avoids collisions with reserved Python names", async () => {
@@ -781,7 +779,7 @@ describe("Pydantic", () => {
             id: Id`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, 6);
+      compare(expect, result);
     });
   });
 
@@ -804,7 +802,7 @@ describe("Pydantic", () => {
               cost: float = Field(decimal_places=2, max_digits=5)`;
         const [result, diagnostics] = await pydanticOutputFor(input);
         expectDiagnosticEmpty(diagnostics);
-        compare(expect, result, startLine);
+        compare(expect, result);
       });
     });
   });
