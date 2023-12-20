@@ -367,6 +367,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     if (emitEquals) {
       builder.push(code` = `);
     }
+    this.#registerImport("pydantic", "Field");
     builder.push(code`Field(`);
     let i = 0;
     const length = Object.keys(metadata).length;
@@ -605,6 +606,8 @@ class PydanticEmitter extends CodeTypeEmitter {
     switch (name ?? scalar.name) {
       case "boolean":
         return "bool";
+      case "bytes":
+        return "bytes";
       case "string":
       case "guid":
       case "url":
