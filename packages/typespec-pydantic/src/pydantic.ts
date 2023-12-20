@@ -23,8 +23,12 @@ import {
   getMinLength,
   getMinValue,
   getMinValueExclusive,
+  getNamespaceFullName,
   getPattern,
   getVisibility,
+  isTemplateDeclaration,
+  isTemplateDeclarationOrInstance,
+  isTemplateInstance,
 } from "@typespec/compiler";
 import {
   CodeTypeEmitter,
@@ -32,6 +36,7 @@ import {
   EmitEntity,
   EmittedSourceFile,
   EmitterOutput,
+  Placeholder,
   SourceFile,
   StringBuilder,
   code,
@@ -156,7 +161,7 @@ class PydanticEmitter extends CodeTypeEmitter {
 
   private declaredType = new Set<string>();
 
-  private deferredModels = new Map<string, Model>();
+  private deferredDeclarations = new Map<string, Model | Scalar>();
 
   #indent(count: number = 1) {
     let val = "";
@@ -194,6 +199,18 @@ class PydanticEmitter extends CodeTypeEmitter {
       return value.substring(1);
     }
     return value;
+  }
+
+  /// Converts camelCase or snake_case name to PascalCase.
+  #toPascalCase(name: string): string {
+    let value = name;
+    // convert snake case to pascal case
+    if (name.includes("_")) {
+      const words = name.split("_");
+      value = words.map((word) => word[0].toUpperCase() + word.substring(1)).join("");
+    }
+    // ensure first letter is capitalized
+    return value[0].toUpperCase() + value.substring(1);
   }
 
   /// Transforms names that start with numbers or are reserved keywords.
@@ -260,7 +277,12 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
   }
 
-  #emitField(builder: StringBuilder, item: ModelProperty | EnumMember): StringBuilder {
+  #emitField(
+    builder: StringBuilder,
+    item: ModelProperty | EnumMember | Scalar,
+    emitEquals: boolean = true,
+    emitEmptyField: boolean = false,
+  ): StringBuilder {
     const metadata: PydanticFieldMetadata = {};
 
     // gather metadata
@@ -336,10 +358,13 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
 
     // don't emit anything if there is no metadata
-    if (Object.keys(metadata).length === 0) return builder;
+    if (Object.keys(metadata).length === 0 && !emitEmptyField) return builder;
 
     // emit metadata
-    builder.push(code` = Field(`);
+    if (emitEquals) {
+      builder.push(code` = `);
+    }
+    builder.push(code`Field(`);
     let i = 0;
     const length = Object.keys(metadata).length;
     for (const [key, val] of Object.entries(metadata)) {
@@ -371,12 +396,16 @@ class PydanticEmitter extends CodeTypeEmitter {
       emittedSourceFile.contents += decl.value + "\n\n";
     }
 
-    for (const [name, model] of this.deferredModels) {
-      const props = this.emitter.emitModelProperties(model);
-      const modelCode = code`class ${name}(BaseModel):\n${props}`;
-      emittedSourceFile.contents += modelCode + "\n\n";
+    for (const [name, item] of this.deferredDeclarations) {
+      if (item.kind === "Model") {
+        const props = this.emitter.emitModelProperties(item);
+        const modelCode = code`class ${name}(BaseModel):\n${props}`;
+        emittedSourceFile.contents += modelCode + "\n\n";
+      } else if (item.kind === "Scalar") {
+        const scalarCode = this.#emitScalar(item, name);
+        emittedSourceFile.contents += scalarCode + "\n\n";
+      }
     }
-
     return emittedSourceFile;
   }
 
@@ -414,7 +443,7 @@ class PydanticEmitter extends CodeTypeEmitter {
       if (this.#isDeclared(modelName)) {
         return code`${modelName}`;
       } else {
-        this.deferredModels.set(modelName, model);
+        this.deferredDeclarations.set(modelName, model);
         return code`"${modelName}"`;
       }
     }
@@ -555,8 +584,8 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
   }
 
-  scalarDeclaration(scalar: Scalar, name: string): EmitterOutput<string> {
-    switch (scalar.name) {
+  #convertScalarName(scalar: Scalar, name: string | undefined): string {
+    switch (name ?? scalar.name) {
       case "boolean":
         return "bool";
       case "string":
@@ -573,26 +602,59 @@ class PydanticEmitter extends CodeTypeEmitter {
       case "int32":
       case "int64":
         return "int";
+      case "float":
       case "float16":
       case "float32":
       case "float64":
         return "float";
+      case "numeric":
       case "decimal":
       case "decimal128":
         return "Decimal";
+      case "plainDate":
+        return "date";
+      case "plainTime":
+        return "time";
       case "utcDateTime":
         return "datetime";
       default:
-        return code`${this.#checkName(scalar.name)}`;
+        return this.#toPascalCase(name ?? scalar.name);
     }
   }
 
-  scalarInstantiation(scalar: Scalar, name: string | undefined): EmitterOutput<string> {
-    const base = this.#getBaseScalar(scalar);
-    if (base !== undefined) {
-      return this.emitter.emitTypeReference(base);
-    } else {
+  #emitScalar(scalar: Scalar, name: string): string | Placeholder<string> {
+    const builder = new StringBuilder();
+    const baseScalarName = this.#convertScalarName(this.#getBaseScalar(scalar), undefined);
+    builder.push(code`${this.#checkName(this.#toPascalCase(name))} = Annotated[`);
+    builder.push(code`${baseScalarName}, `);
+    this.#emitField(builder, scalar, false, true);
+    builder.push(code`]`);
+    return builder.reduce();
+  }
+
+  scalarDeclaration(scalar: Scalar, name: string): EmitterOutput<string> {
+    // workaround to avoid emitting scalar template declarations
+    if (scalar.node.templateParameters.length > 0) {
       return this.emitter.result.none();
+    }
+    const converted = this.#convertScalarName(scalar, name);
+    // don't redeclare TypeSpec scalars
+    if (scalar.namespace !== undefined) {
+      const namespaceName = getNamespaceFullName(scalar.namespace);
+      if (namespaceName === "TypeSpec") {
+        return code`${converted}`;
+      }
+    }
+    return this.emitter.result.declaration(converted, this.#emitScalar(scalar, converted));
+  }
+
+  scalarInstantiation(scalar: Scalar, name: string | undefined): EmitterOutput<string> {
+    const converted = this.#convertScalarName(scalar, name);
+    if (this.#isDeclared(converted)) {
+      return code`${converted}`;
+    } else {
+      this.deferredDeclarations.set(converted, scalar);
+      return code`"${converted}"`;
     }
   }
 

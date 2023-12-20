@@ -7,9 +7,6 @@ describe("Pydantic", () => {
   describe("models", () => {
     it("supports simple properties", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget {
             name: string;
             price: float;
@@ -31,9 +28,6 @@ describe("Pydantic", () => {
 
     it("supports documentation with @doc", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         @doc("This is a widget.")
         model Widget {
             @doc("The name of the widget.")
@@ -53,9 +47,6 @@ describe("Pydantic", () => {
 
     it("supports documentation with doc comment", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         /** This is a widget. */
         model Widget {
             /** The name of the widget. */
@@ -75,9 +66,6 @@ describe("Pydantic", () => {
 
     it("supports string constraints", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget {
           @minLength(1)
           @maxLength(10)
@@ -96,9 +84,6 @@ describe("Pydantic", () => {
 
     it("transforms names that start with reserved keywords", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Foo {
             in: string;
             def: string;
@@ -119,9 +104,6 @@ describe("Pydantic", () => {
 
     it("transforms names that start with numbers", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Foo {
             "1": string;
         }`;
@@ -136,9 +118,6 @@ describe("Pydantic", () => {
 
     it("supports default values", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget {
             name: string = "Widget";
             price: float = 9.99;
@@ -175,9 +154,6 @@ describe("Pydantic", () => {
 
     it("support intrinsic types", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Foo {
             p1: never;
             p2: null;
@@ -201,9 +177,6 @@ describe("Pydantic", () => {
 
     it("supports property references", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Foo {
             prop: string;
         }
@@ -226,9 +199,6 @@ describe("Pydantic", () => {
 
     it("supports literal properties", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget {
             name: "widget";
             price: 15.50;
@@ -248,9 +218,6 @@ describe("Pydantic", () => {
 
     it("supports array properties", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget {
             parts: string[];
         }`;
@@ -266,9 +233,6 @@ describe("Pydantic", () => {
 
     it("supports array declaration as RootModel", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model WidgetParts is string[];
 
         model Widget {
@@ -294,9 +258,6 @@ describe("Pydantic", () => {
 
     it("supports array declaration aliases", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         alias WidgetParts = string[];
 
         model Widget {
@@ -313,9 +274,6 @@ describe("Pydantic", () => {
 
     it("supports tuple properties", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget {
             parts: [string, int16, float[]];
         }`;
@@ -330,9 +288,6 @@ describe("Pydantic", () => {
 
     it("supports class reference properties", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget {
             part: WidgetPart;
             parts: WidgetPart[];
@@ -355,9 +310,6 @@ describe("Pydantic", () => {
 
     it("supports dict properties", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget {
             properties: Record<string>;
         }`;
@@ -371,9 +323,6 @@ describe("Pydantic", () => {
 
     it("emits warning and object for anonymous model properties", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget {
             widgetPart: {
                 name: string;
@@ -393,9 +342,6 @@ describe("Pydantic", () => {
 
     it("converts camelCase properties to snake_case", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget {
             someWeirdCasing: string;
         }`;
@@ -409,9 +355,6 @@ describe("Pydantic", () => {
 
     it("supports optional properties", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget {
             name?: string;
         }`;
@@ -425,9 +368,6 @@ describe("Pydantic", () => {
 
     it("supports named template instantiations", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget<T> {
             contents: T;
         }
@@ -443,9 +383,6 @@ describe("Pydantic", () => {
 
     it("supports anonymous template instantiations", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget<T> {
             contents: T;
         }
@@ -466,9 +403,6 @@ describe("Pydantic", () => {
 
     it("supports union instantiations", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         union SomeUnion<T> {
             T
         }
@@ -479,24 +413,6 @@ describe("Pydantic", () => {
       const expect = `
         class Widget(BaseModel):
             widget: Union[str]`;
-      const [result, diagnostics] = await pydanticOutputFor(input);
-      expectDiagnosticEmpty(diagnostics);
-      compare(expect, result, startLine);
-    });
-
-    it("supports scalar instantiations", async () => {
-      const input = `
-        @test
-        namespace WidgetManager;
-
-        scalar MyString<T> extends string;
-
-        model Widget {
-            name: MyString<string>;
-        };`;
-      const expect = `
-        class Widget(BaseModel):
-            name: str`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result, startLine);
@@ -545,9 +461,6 @@ describe("Pydantic", () => {
   describe("operations", () => {
     it("ignores operations", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget {
             name: string
         }
@@ -565,9 +478,6 @@ describe("Pydantic", () => {
   describe("interfaces", () => {
     it("ignores interfaces", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget {
             name: string
         }
@@ -587,9 +497,6 @@ describe("Pydantic", () => {
   describe("enums", () => {
     it("supports enum declarations", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         enum WidgetShape {
             Cube,
             Sphere,
@@ -627,9 +534,6 @@ describe("Pydantic", () => {
 
     it("supports documentation with @doc", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         @doc("This is a widget shape.")
         enum WidgetShape {
             @doc("This is a cube.")
@@ -656,9 +560,6 @@ describe("Pydantic", () => {
 
     it("supports documentation with doc comments", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         /** This is a widget shape. */
         enum WidgetShape {
             /** This is a cube. */
@@ -685,9 +586,6 @@ describe("Pydantic", () => {
 
     it("supports enum member references", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         enum WidgetShape {
             cube,
             circle: "Sphere",
@@ -714,9 +612,6 @@ describe("Pydantic", () => {
   describe("unions", () => {
     it("supports union literals as properties", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         model Widget {
             color: "red" | "green" | "blue";
             count: 1 | 2 | 3;
@@ -736,9 +631,6 @@ describe("Pydantic", () => {
 
     it("supports union declarations as properties", async () => {
       const input = `
-        @test
-        namespace WidgetManager;
-
         union UnionOfTypes {
             integer: int16,
             string,
@@ -774,6 +666,87 @@ describe("Pydantic", () => {
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result, startLine);
+    });
+  });
+
+  describe("scalars", () => {
+    it("supports scalar instantiations", async () => {
+      const input = `
+        scalar myString<T> extends string;
+
+        model Widget {
+            name: myString<string>;
+        };`;
+      const expect = `
+        class Widget(BaseModel):
+            name: "MyStringString"
+            
+        MyStringString = Annotated[str, Field()]`;
+      const [result, diagnostics] = await pydanticOutputFor(input);
+      expectDiagnosticEmpty(diagnostics);
+      compare(expect, result, startLine);
+    });
+
+    it("supports scalar declarations", async () => {
+      const input = `
+        @doc("My custom string")
+        @minLength(1)
+        scalar my_string extends string;
+
+        model Widget {
+            name: my_string;
+        }`;
+      const expect = `
+        MyString = Annotated[str, Field(description="My custom string", min_length=1)]
+ 
+        class Widget(BaseModel):
+            name: MyString`;
+      const [result, diagnostics] = await pydanticOutputFor(input);
+      expectDiagnosticEmpty(diagnostics);
+      compare(expect, result, 6);
+    });
+
+    it("translates TypeSpec scalars to Python types", async () => {
+      const input = `
+        model Widget {
+            name: string;
+            price: float;
+            num: int16;
+            action: boolean;
+            date: plainDate;
+            time: plainTime;
+            dateTime: utcDateTime;
+        }`;
+      const expect = `
+        class Widget(BaseModel):
+            name: str
+            price: float
+            num: int
+            action: bool
+            date: date
+            time: time
+            date_time: datetime`;
+      const [result, diagnostics] = await pydanticOutputFor(input);
+      expectDiagnosticEmpty(diagnostics);
+      compare(expect, result, 6);
+    });
+
+    it("avoids collisions with reserved Python names", async () => {
+      const input = `
+        model Widget {
+            id: id;
+        }
+        
+        @format("uuid")
+        scalar id extends string;`;
+      const expect = `
+        Id = Annotated[str, Field()]
+
+        class Widget(BaseModel):
+            id: Id`;
+      const [result, diagnostics] = await pydanticOutputFor(input);
+      expectDiagnosticEmpty(diagnostics);
+      compare(expect, result, 6);
     });
   });
 
