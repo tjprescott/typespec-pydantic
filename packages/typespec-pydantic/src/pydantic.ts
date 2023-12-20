@@ -517,8 +517,8 @@ class PydanticEmitter extends CodeTypeEmitter {
     const members = this.emitter.emitEnumMembers(en);
     const builder = new StringBuilder();
     const docs = getDoc(this.emitter.getProgram(), en);
-    this.imports.add("pydantic", "BaseModel");
-    builder.push(code`class ${name}(BaseModel):\n`);
+    this.imports.add("enum", "Enum");
+    builder.push(code`class ${name}(Enum):\n`);
     if (docs !== undefined) {
       builder.push(code`${this.#indent()}"""${docs}"""\n`);
     }

@@ -549,12 +549,12 @@ describe("Pydantic", () => {
             color?: WidgetColor;
         }`;
       const expect = `
-        class WidgetShape(BaseModel):
+        class WidgetShape(Enum):
             CUBE = Field(default="Cube", frozen=True)
             SPHERE = Field(default="Sphere", frozen=True)
             PYRAMID = Field(default="Pyramid", frozen=True)
 
-        class WidgetColor(BaseModel):
+        class WidgetColor(Enum):
             RED = Field(default="Red", frozen=True)
             GREEN = Field(default="Green", frozen=True)
             BLUE = Field(default="Blue", frozen=True)
@@ -580,7 +580,7 @@ describe("Pydantic", () => {
         }`;
 
       const expect = `
-        class WidgetShape(BaseModel):
+        class WidgetShape(Enum):
             """This is a widget shape."""
             CUBE = Field(description="This is a cube.", default="cube", frozen=True)
             """This is a cube."""
@@ -606,7 +606,7 @@ describe("Pydantic", () => {
         }`;
 
       const expect = `
-        class WidgetShape(BaseModel):
+        class WidgetShape(Enum):
             """This is a widget shape."""
             CUBE = Field(description="This is a cube.", default="cube", frozen=True)
             """This is a cube."""
@@ -635,7 +635,7 @@ describe("Pydantic", () => {
             cube: Literal[WidgetShape.CUBE]
             circle: Literal[WidgetShape.CIRCLE]
 
-        class WidgetShape(BaseModel):
+        class WidgetShape(Enum):
             CUBE = Field(default="cube", frozen=True)
             CIRCLE = Field(default="Sphere", frozen=True)`;
       const [result, diagnostics] = await pydanticOutputFor(input);
