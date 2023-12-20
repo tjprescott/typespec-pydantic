@@ -56,9 +56,9 @@ interface UnionVariantMetadata {
 
 /// Metadata for a Pydantic field.
 interface PydanticFieldMetadata {
-  [key: string]: string | StringBuilder | number | boolean | string[] | Type | undefined;
+  [key: string]: string | StringBuilder | number | boolean | string[] | Type | undefined | null;
   // define a default value for a field.
-  default?: Type | string | number;
+  default?: Type | string | number | null;
   // define a callable that will be called to generate a default value.
   defaultFactory?: string;
   // whether the default value of the field should be validated. By default, it is not.
@@ -258,7 +258,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     return undefined;
   }
 
-  #emitFieldValue(value: string | StringBuilder | number | boolean | Type | string[]): string | StringBuilder {
+  #emitFieldValue(value: string | StringBuilder | number | boolean | Type | string[] | null): string | StringBuilder {
     if (typeof value === "boolean") {
       return value ? "True" : "False";
     } else if (typeof value === "string") {
@@ -270,6 +270,8 @@ class PydanticEmitter extends CodeTypeEmitter {
       }
     } else if (typeof value === "number") {
       return value.toString();
+    } else if (value === null) {
+      return code`None`;
     } else {
       return code`${this.emitter.emitTypeReference(value as Type)}`;
     }
@@ -287,8 +289,11 @@ class PydanticEmitter extends CodeTypeEmitter {
     const doc = getDoc(this.emitter.getProgram(), item);
     metadata.description = doc !== undefined ? code`"${doc}"` : undefined;
     if (item.kind === "ModelProperty") {
+      const isOptional = item.optional;
       if (item.default !== undefined) {
         metadata.default = item.default;
+      } else if (isOptional) {
+        metadata.default = null;
       }
     } else if (item.kind === "EnumMember") {
       metadata.default = item.value !== undefined ? item.value : this.#checkName(item.name);
@@ -387,7 +392,7 @@ class PydanticEmitter extends CodeTypeEmitter {
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
     const emittedSourceFile: EmittedSourceFile = {
       path: sourceFile.path,
-      contents: this.#generateHeader() + "\n\n",
+      contents: this.#generateHeader() + "\n",
     };
 
     for (const decl of sourceFile.globalScope.declarations) {

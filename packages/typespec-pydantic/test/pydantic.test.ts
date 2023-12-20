@@ -358,7 +358,7 @@ describe("Pydantic", () => {
         }`;
       const expect = `
         class Widget(BaseModel):
-            name: Optional[str]`;
+            name: Optional[str] = Field(default=None)`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result);
@@ -558,8 +558,8 @@ describe("Pydantic", () => {
             BLUE = Field(default="Blue", frozen=True)
 
         class Widget(BaseModel):
-            shape: Optional[WidgetShape]
-            color: Optional[WidgetColor]`;
+            shape: Optional[WidgetShape] = Field(default=None)
+            color: Optional[WidgetColor] = Field(default=None)`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result);
@@ -656,7 +656,7 @@ describe("Pydantic", () => {
             color: Literal["red", "green", "blue"]
             count: Literal[1, 2, 3]
             numbers: Union[int, float]
-            mixed: Optional[Union[Literal["moo"], int]]`;
+            mixed: Optional[Union[Literal["moo"], int]] = Field(default=None)`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result);
@@ -692,8 +692,8 @@ describe("Pydantic", () => {
 
       const expect = `
         class Widget(BaseModel):
-            type: Optional[Union[int, str, bool]]
-            literal: Optional[Literal[1, "two", False]]
+            type: Optional[Union[int, str, bool]] = Field(default=None)
+            literal: Optional[Literal[1, "two", False]] = Field(default=None)
             named_reference: bool
             mixed: Union[Literal[1, 2, "void"], bool]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
