@@ -26,9 +26,6 @@ import {
   getNamespaceFullName,
   getPattern,
   getVisibility,
-  isTemplateDeclaration,
-  isTemplateDeclarationOrInstance,
-  isTemplateInstance,
 } from "@typespec/compiler";
 import {
   CodeTypeEmitter,
@@ -234,21 +231,7 @@ class PydanticEmitter extends CodeTypeEmitter {
 
   #findDiscriminator(type: Type): string | undefined {
     if (type.kind === "Union") {
-      const variants = [...type.variants.values()];
-      const discriminators = variants.map((variant) => this.#findDiscriminator(variant.type));
-      // if all discriminators are undefined, return undefined. If all discriminator values are the same, return that value.
-      if (discriminators.every((discriminator) => discriminator === undefined)) {
-        return undefined;
-      }
-      if (discriminators.every((discriminator) => discriminator === discriminators[0])) {
-        return discriminators[0];
-      } else {
-        reportDiagnostic(this.emitter.getProgram(), {
-          code: "invalid-discriminated-union",
-          target: type,
-        });
-        return undefined;
-      }
+      return getDiscriminator(this.emitter.getProgram(), type)?.propertyName;
     } else if (type.kind === "Model") {
       const discriminator = getDiscriminator(this.emitter.getProgram(), type);
       if (discriminator !== undefined) {
@@ -413,7 +396,8 @@ class PydanticEmitter extends CodeTypeEmitter {
     const props = this.emitter.emitModelProperties(model);
     const docs = getDoc(this.emitter.getProgram(), model);
     const builder = new StringBuilder();
-    builder.push(code`class ${name}(BaseModel):\n`);
+    const baseModel = model.baseModel?.name ?? "BaseModel";
+    builder.push(code`class ${name}(${baseModel}):\n`);
     if (docs !== undefined) {
       builder.push(code`${this.#indent()}"""${docs}"""\n`);
     }

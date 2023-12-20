@@ -421,27 +421,25 @@ describe("Pydantic", () => {
     it("supports discriminated unions", async () => {
       const input = `
         @discriminator("kind")
-        model BaseShape {}
+        union Shape {
+          Circle,
+          Square,
+        }
         
-        model Circle extends BaseShape {
+        model Circle {
           kind: "Circle";
           radius: float32;
         }
         
-        model Square extends BaseShape {
+        model Square {
           kind: "Square";
           length: float32;
         }
-        
-        alias Shape = Circle | Square;
         
         model Foo {
           shape: Shape
         }`;
       const expect = `
-        class BaseShape(BaseModel):
-            pass
-
         class Circle(BaseModel):
             kind: Literal["Circle"]
             radius: float
@@ -452,6 +450,43 @@ describe("Pydantic", () => {
             
         class Foo(BaseModel):
             shape: Union[Circle, Square] = Field(discriminator="kind")`;
+      const [result, diagnostics] = await pydanticOutputFor(input);
+      expectDiagnosticEmpty(diagnostics);
+      compare(expect, result, startLine);
+    });
+
+    it("supports extends relationship", async () => {
+      const input = `
+        @discriminator("kind")
+        model Shape {}
+        
+        model Circle extends Shape {
+          kind: "Circle";
+          radius: float32;
+        }
+        
+        model Square extends Shape {
+          kind: "Square";
+          length: float32;
+        }
+        
+        model Foo {
+          shape: Shape
+        }`;
+      const expect = `
+        class Shape(BaseModel):
+            pass
+
+        class Circle(Shape):
+            kind: Literal["Circle"]
+            radius: float
+      
+        class Square(Shape):
+            kind: Literal["Square"]
+            length: float
+            
+        class Foo(BaseModel):
+            shape: Shape = Field(discriminator="kind")`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result, startLine);
