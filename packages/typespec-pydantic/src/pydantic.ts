@@ -120,7 +120,7 @@ interface PydanticFieldMetadata {
 class PydanticEmitter extends CodeTypeEmitter {
   static readonly pythonIndent = "    ";
 
-  static readonly builtInTypes = [
+  static readonly builtInPythonTypes = [
     "int",
     "float",
     "complex",
@@ -137,7 +137,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     "frozenset",
   ];
 
-  static readonly reservedKeywords = [
+  static readonly reservedPythonKeywords = [
     "and",
     "as",
     "assert",
@@ -229,7 +229,7 @@ class PydanticEmitter extends CodeTypeEmitter {
 
   /// Transforms names that start with numbers or are reserved keywords.
   #checkName(name: string): string {
-    if (PydanticEmitter.reservedKeywords.includes(name)) {
+    if (PydanticEmitter.reservedPythonKeywords.includes(name)) {
       return `${name}_`;
     } else if (name.match(/^\d/)) {
       return `_${name}`;
@@ -605,28 +605,39 @@ class PydanticEmitter extends CodeTypeEmitter {
 
   #convertScalarName(scalar: Scalar, name: string | undefined): string {
     const scalarName = name ?? scalar.name;
-    const isBuiltIn = PydanticEmitter.builtInTypes.includes(scalarName);
+    const isBuiltIn = PydanticEmitter.builtInPythonTypes.includes(scalarName);
     switch (scalarName) {
       case "boolean":
         return "bool";
       case "string":
-      case "guid":
       case "url":
-      case "uuid":
-      case "password":
-      case "armId":
-      case "ipAddress":
-      case "azureLocation":
-      case "eTag":
         return "str";
+      case "null":
+      case "void":
+      case "never":
+        return "None";
+      case "unixTimestamp32":
+      case "uint8":
+      case "uint16":
+      case "uint32":
+      case "uint64":
+      case "safeint":
+      case "integer":
+      case "int8":
       case "int16":
       case "int32":
       case "int64":
         return "int";
+      case "float":
       case "float16":
       case "float32":
       case "float64":
         return "float";
+      case "duration":
+        this.imports.add("datetime", "timedelta");
+        return "timedelta";
+      case "offsetDateTime":
+        return "str";
       case "numeric":
       case "decimal":
       case "decimal128":
@@ -641,6 +652,9 @@ class PydanticEmitter extends CodeTypeEmitter {
       case "utcDateTime":
         this.imports.add("datetime", "datetime");
         return "datetime";
+      case "object":
+      case "unknown":
+        return "object";
       default:
         if (isBuiltIn) {
           return scalarName;
