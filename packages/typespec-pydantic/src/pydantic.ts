@@ -289,7 +289,8 @@ class PydanticEmitter extends CodeTypeEmitter {
 
     // gather metadata
     const doc = getDoc(this.emitter.getProgram(), item);
-    metadata.description = doc !== undefined ? code`"${doc}"` : undefined;
+    const mergedLines = doc?.split("\n").join("\\n");
+    metadata.description = mergedLines !== undefined ? code`"${mergedLines}"` : undefined;
     if (item.kind === "ModelProperty") {
       const isOptional = item.optional;
       if (item.default !== undefined) {
@@ -416,18 +417,29 @@ class PydanticEmitter extends CodeTypeEmitter {
     return emittedSourceFile;
   }
 
+  #emitDocs(builder: StringBuilder, type: Type) {
+    const docs = getDoc(this.emitter.getProgram(), type);
+    if (docs === undefined) return;
+    if (docs.split("\n").length > 1) {
+      builder.push(code`${this.#indent()}"""\n`);
+      for (const line of docs.split("\n")) {
+        builder.push(code`${this.#indent()}${line}\n`);
+      }
+      builder.push(code`${this.#indent()}"""\n`);
+    } else {
+      builder.push(code`${this.#indent()}"""${docs}"""\n`);
+    }
+  }
+
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
     const props = this.emitter.emitModelProperties(model);
-    const docs = getDoc(this.emitter.getProgram(), model);
     const builder = new StringBuilder();
     const baseModel = model.baseModel?.name ?? "BaseModel";
     if (baseModel === "BaseModel") {
       this.imports.add("pydantic", "BaseModel");
     }
     builder.push(code`class ${name}(${baseModel}):\n`);
-    if (docs !== undefined) {
-      builder.push(code`${this.#indent()}"""${docs}"""\n`);
-    }
+    this.#emitDocs(builder, model);
     if ([...model.properties.values()].length > 0) {
       builder.push(code`${props}`);
     } else {
@@ -502,10 +514,8 @@ class PydanticEmitter extends CodeTypeEmitter {
       builder.push(code`]`);
     }
     this.#emitField(builder, property);
-    const docs = getDoc(this.emitter.getProgram(), property);
-    if (docs !== undefined) {
-      builder.push(code`\n${this.#indent()}"""${docs}"""`);
-    }
+    builder.push(code`\n`);
+    this.#emitDocs(builder, property);
     return builder.reduce();
   }
 
@@ -516,12 +526,9 @@ class PydanticEmitter extends CodeTypeEmitter {
   enumDeclaration(en: Enum, name: string): EmitterOutput<string> {
     const members = this.emitter.emitEnumMembers(en);
     const builder = new StringBuilder();
-    const docs = getDoc(this.emitter.getProgram(), en);
     this.imports.add("enum", "Enum");
     builder.push(code`class ${name}(Enum):\n`);
-    if (docs !== undefined) {
-      builder.push(code`${this.#indent()}"""${docs}"""\n`);
-    }
+    this.#emitDocs(builder, en);
     builder.push(code`${members}`);
     return this.#declare(name, builder.reduce());
   }
@@ -538,10 +545,8 @@ class PydanticEmitter extends CodeTypeEmitter {
     const builder = new StringBuilder();
     builder.push(code`${this.#toSnakeCase(member.name).toUpperCase()}`);
     this.#emitField(builder, member);
-    const docs = getDoc(this.emitter.getProgram(), member);
-    if (docs !== undefined) {
-      builder.push(code`\n${this.#indent()}"""${docs}"""`);
-    }
+    builder.push(code`\n`);
+    this.#emitDocs(builder, member);
     return builder.reduce();
   }
 

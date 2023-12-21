@@ -47,17 +47,33 @@ describe("Pydantic", () => {
 
     it("supports documentation with doc comment", async () => {
       const input = `
-        /** This is a widget. */
+        /**
+         * This is a widget.
+         * 
+         * It is so amazing and wonderful... and a widget.
+         */
         model Widget {
-            /** The name of the widget. */
+            /** 
+             * The name of the widget.
+             * 
+             * It can really be any name you want. Really.
+             */
             name: string;
         }`;
 
       const expect = `
         class Widget(BaseModel):
-            """This is a widget."""
-            name: str = Field(description="The name of the widget.")
-            """The name of the widget."""
+            """
+            This is a widget.
+            
+            It is so amazing and wonderful... and a widget.
+            """
+            name: str = Field(description="The name of the widget.\\n\\nIt can really be any name you want. Really.")
+            """
+            The name of the widget.
+            
+            It can really be any name you want. Really.
+            """
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
