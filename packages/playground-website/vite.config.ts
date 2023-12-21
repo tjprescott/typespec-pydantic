@@ -5,10 +5,25 @@ const githubUrl = `https://github.com/tjprescott/typespec-pydantic`;
 const config = defineConfig(
   definePlaygroundViteConfig({
     defaultEmitter: "typespec-pydantic",
-    libraries: ["@typespec/compiler", "typespec-pydantic"],
+    libraries: [
+      "@typespec/compiler",
+      "@typespec/http",
+      "@typespec/rest",
+      "@typespec/openapi",
+      "@typespec/versioning",
+      "@azure-tools/typespec-azure-core",
+      "@azure-tools/typespec-autorest",
+      "@azure-tools/typespec-azure-resource-manager",
+      "@azure-tools/typespec-client-generator-core",
+      "typespec-pydantic",
+    ],
     samples: {
-      "My sample": {
+      "Basic Sample": {
         filename: "samples/basic.tsp",
+        preferredEmitter: "typespec-pydantic",
+      },
+      "Azure Sample": {
+        filename: "samples/azure.tsp",
         preferredEmitter: "typespec-pydantic",
       },
     },

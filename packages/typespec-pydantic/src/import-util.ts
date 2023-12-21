@@ -19,6 +19,6 @@ export class ImportManager {
     for (const [moduleName, names] of this.imports.entries()) {
       builder.push(code`from ${moduleName} import ${[...names].join(", ")}\n`);
     }
-    return builder.reduce() + "";
+    return builder.reduce() + "\n";
   }
 }
