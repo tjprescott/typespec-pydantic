@@ -26,6 +26,29 @@ describe("Pydantic", () => {
       compare(expect, result);
     });
 
+    it("supports @knownValues", async () => {
+      const input = `
+        enum WidgetShape {
+            square,
+            circle,
+        }
+
+        model Widget {
+          @knownValues(WidgetShape)
+          shape: string;
+        }`;
+      const expect = `
+        class Widget(BaseModel):
+            shape: Union[str, WidgetShape]
+
+        class WidgetShape(Enum):
+            SQUARE = Field(default="square", frozen=True)
+            CIRCLE = Field(default="circle", frozen=True)`;
+      const [result, diagnostics] = await pydanticOutputFor(input);
+      expectDiagnosticEmpty(diagnostics);
+      compare(expect, result);
+    });
+
     it("supports documentation with @doc", async () => {
       const input = `
         @doc("This is a widget.")
@@ -795,6 +818,33 @@ describe("Pydantic", () => {
 
         class Widget(BaseModel):
             id: Id`;
+      const [result, diagnostics] = await pydanticOutputFor(input);
+      expectDiagnosticEmpty(diagnostics);
+      compare(expect, result);
+    });
+
+    it("supports @knownValues", async () => {
+      const input = `
+        enum WidgetShape {
+            square,
+            circle,
+        }
+
+        @knownValues(WidgetShape)
+        scalar WidgetShapes extends string;
+
+        model Widget {
+          shape: WidgetShapes;
+        }`;
+      const expect = `
+        WidgetShapes = Annotated[Union[str, WidgetShape], Field()]
+
+        class Widget(BaseModel):
+            shape: WidgetShapes
+
+        class WidgetShape(Enum):
+            SQUARE = Field(default="square", frozen=True)
+            CIRCLE = Field(default="circle", frozen=True)`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result);

@@ -17,6 +17,7 @@ import {
   Union,
   getDiscriminator,
   getDoc,
+  getKnownValues,
   getMaxLength,
   getMaxValue,
   getMaxValueExclusive,
@@ -484,7 +485,7 @@ class PydanticEmitter extends CodeTypeEmitter {
   modelPropertyLiteral(property: ModelProperty): EmitterOutput<string> {
     const builder = new StringBuilder();
     const isOptional = property.optional;
-    ``;
+    const knownValues = getKnownValues(this.emitter.getProgram(), property);
     let type: EmitEntity<string> | undefined = undefined;
     type = this.emitter.emitTypeReference(property.type);
     // don't emit anything if type is `never`
@@ -504,6 +505,8 @@ class PydanticEmitter extends CodeTypeEmitter {
       builder.push(code`${this.emitter.emitUnionVariants(property.type)}`);
     } else if (property.type.kind === "UnionVariant") {
       builder.push(code`${this.emitter.emitTypeReference(property.type.type)}`);
+    } else if (property.type.kind === "Scalar" && knownValues !== undefined) {
+      builder.push(code`Union[${type}, ${knownValues.name}]`);
     } else {
       builder.push(code`${type}`);
     }
@@ -669,11 +672,17 @@ class PydanticEmitter extends CodeTypeEmitter {
   }
 
   #emitScalar(scalar: Scalar, name: string): string | Placeholder<string> {
+    const knownValues = getKnownValues(this.emitter.getProgram(), scalar);
     const builder = new StringBuilder();
     const baseScalarName = this.#convertScalarName(this.#getBaseScalar(scalar), undefined);
     this.imports.add("typing", "Annotated");
     builder.push(code`${this.#checkName(this.#toPascalCase(name))} = Annotated[`);
-    builder.push(code`${baseScalarName}, `);
+    if (knownValues !== undefined) {
+      builder.push(code`Union[${baseScalarName}, ${knownValues.name}], `);
+    } else {
+      builder.push(code`${baseScalarName}, `);
+    }
+
     this.#emitField(builder, scalar, false, true);
     builder.push(code`]`);
     return builder.reduce();
