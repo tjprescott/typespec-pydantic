@@ -48,7 +48,8 @@
     "@typespec/openapi": "~0.51.0",
     "@typespec/openapi3": "^0.51.0",
     "@typespec/rest": "~0.51.0",
-    "typespec-pydantic": "workspace:~1.0.0-beta.1"
+    "typespec-pydantic": "workspace:~1.0.0-beta.1",
+    "typespec-flask": "workspace:~1.0.0-beta.1"
   },
   "devDependencies": {
     "@types/mocha": "~10.0.1",
