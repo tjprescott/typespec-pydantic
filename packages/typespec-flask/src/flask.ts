@@ -1,18 +1,7 @@
-import { DeclarationKind, DeclarationManager, ImportKind, PythonPartialEmitter } from "typespec-python";
-import {
-  EmitContext,
-  Interface,
-  Model,
-  Namespace,
-  Operation,
-  Program,
-  Scalar,
-  Type,
-  getNamespaceFullName,
-} from "@typespec/compiler";
+import { DeclarationKind, DeclarationManager, ImportKind, PythonPartialOperationEmitter } from "typespec-python";
+import { EmitContext, Interface, Model, Operation, Scalar, Type, getNamespaceFullName } from "@typespec/compiler";
 import {
   AssetEmitter,
-  Context,
   EmittedSourceFile,
   EmitterOutput,
   Placeholder,
@@ -36,63 +25,16 @@ export async function $onEmit(context: EmitContext<FlaskEmitterOptions>) {
   await assetEmitter.writeOutput();
 }
 
-export class FlaskEmitter extends PythonPartialEmitter {
+export class FlaskEmitter extends PythonPartialOperationEmitter {
   constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
     super(emitter);
     this.declarations = declarations;
   }
 
-  programContext(program: Program): Context {
-    const options = this.emitter.getOptions();
-    const outFile = options["output-file"] ?? "operations.py";
-    const sourceFile = this.emitter.createSourceFile(outFile);
-    return {
-      scope: sourceFile.globalScope,
-    };
-  }
-
-  /** Create a new source file for each namespace. */
-  namespaceContext(namespace: Namespace): Context {
-    if (namespace.name === "TypeSpec") {
-      return {};
-    }
-    const fullPath = getNamespaceFullName(namespace)
-      .split(".")
-      .map((seg) => this.toSnakeCase(seg))
-      .join("/");
-    const operationsFile = this.emitter.createSourceFile(`${fullPath}/operations.py`);
-    return {
-      scope: operationsFile.globalScope,
-    };
-  }
-
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
-    const builder = new StringBuilder();
-
     this.imports.add("flask", "Flask", ImportKind.regular, sourceFile);
-    for (const [moduleName, names] of this.imports.getImports(sourceFile, ImportKind.regular)) {
-      builder.push(code`from ${moduleName} import ${[...names].join(", ")}\n`);
-    }
-
-    const deferredImports = this.imports.getImports(sourceFile, ImportKind.deferred);
-    if (deferredImports.size > 0) {
-      builder.push(code`\nif TYPE_CHECKING:\n`);
-      for (const [moduleName, names] of deferredImports) {
-        builder.push(code`${this.indent()}from ${moduleName} import ${[...names].join(", ")}\n`);
-      }
-    }
-
-    const emittedSourceFile: EmittedSourceFile = {
-      path: sourceFile.path,
-      contents: `${builder.reduce()}\napp = Flask(__name__)\n\n`,
-    };
-
-    for (const decl of sourceFile.globalScope.declarations) {
-      if (decl.value === undefined || decl.value === "") continue;
-      emittedSourceFile.contents += decl.value + "\n";
-    }
-
-    return emittedSourceFile;
+    sourceFile.meta["preamble"] = code`app = Flask(__name__)`;
+    return super.sourceFile(sourceFile);
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
@@ -110,7 +52,7 @@ export class FlaskEmitter extends PythonPartialEmitter {
     return existing;
   }
 
-  #emitScalar(scalar: Scalar, name: string): string | Placeholder<string> {
+  emitScalar(scalar: Scalar, name: string, sourceFile?: SourceFile<string>): string | Placeholder<string> {
     const builder = new StringBuilder();
     builder.push(code`${this.transformReservedName(this.toPascalCase(name))}`);
     return builder.reduce();
@@ -129,7 +71,7 @@ export class FlaskEmitter extends PythonPartialEmitter {
         return code`${converted}`;
       }
     }
-    return this.emitter.result.declaration(converted, this.#emitScalar(scalar, converted));
+    return this.emitter.result.declaration(converted, this.emitScalar(scalar, converted));
   }
 
   scalarInstantiation(scalar: Scalar, name: string | undefined): EmitterOutput<string> {

@@ -2,7 +2,9 @@ import {
   BooleanLiteral,
   IntrinsicType,
   Model,
+  Namespace,
   NumericLiteral,
+  Program,
   Scalar,
   StringLiteral,
   Tuple,
@@ -16,6 +18,7 @@ import {
 import {
   AssetEmitter,
   CodeTypeEmitter,
+  Context,
   Declaration,
   EmittedSourceFile,
   EmitterOutput,
@@ -34,7 +37,7 @@ interface UnionVariantMetadata {
   value: string | StringBuilder;
 }
 
-export class PythonPartialEmitter extends CodeTypeEmitter {
+export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   protected currNamespace: string[] = [];
 
   protected imports: ImportManager;
@@ -44,6 +47,40 @@ export class PythonPartialEmitter extends CodeTypeEmitter {
   constructor(emitter: AssetEmitter<string, Record<string, never>>) {
     super(emitter);
     this.imports = new ImportManager(emitter);
+  }
+
+  protected createProgramContext(fileName: string): Context {
+    const options = this.emitter.getOptions();
+    const resolvedFileName = options["output-file"] ?? fileName;
+    const sourceFile = this.emitter.createSourceFile(resolvedFileName);
+    return {
+      scope: sourceFile.globalScope,
+    };
+  }
+
+  protected createNamespaceContext(namespace: Namespace, fileName: string): Context {
+    if (namespace.name === "TypeSpec") {
+      return {};
+    }
+    const file = this.emitter.createSourceFile(this.buildFilePath(namespace, fileName));
+    return {
+      scope: file.globalScope,
+    };
+  }
+
+  /** Constructs a file system path for a given namespace. If a fileName is provided,
+   * the path will be to a file. Otherwise, the path will be to the folder.
+   */
+  buildFilePath(namespace: Namespace, fileName?: string): string {
+    const fullPath = getNamespaceFullName(namespace)
+      .split(".")
+      .map((seg) => this.toSnakeCase(seg))
+      .join("/");
+    if (fileName !== undefined) {
+      return `${fullPath}/${fileName}`;
+    } else {
+      return fullPath;
+    }
   }
 
   /** Convert a TypeSpec scalar name to the relevant Python equivalent. */
@@ -513,8 +550,86 @@ export class PythonPartialEmitter extends CodeTypeEmitter {
     }
   }
 
+  abstract emitScalar(scalar: Scalar, name: string, sourceFile?: SourceFile<string>): string | Placeholder<string>;
+
+  sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
+    const builder = new StringBuilder();
+
+    // render imports
+    for (const [moduleName, names] of this.imports.getImports(sourceFile, ImportKind.regular)) {
+      builder.push(code`from ${moduleName} import ${[...names].join(", ")}\n`);
+    }
+
+    const deferredImports = this.imports.getImports(sourceFile, ImportKind.deferred);
+    if (deferredImports.size > 0) {
+      builder.push(code`\nif TYPE_CHECKING:\n`);
+      for (const [moduleName, names] of deferredImports) {
+        builder.push(code`${this.indent()}from ${moduleName} import ${[...names].join(", ")}\n`);
+      }
+    }
+
+    const preamble = sourceFile.meta["preamble"] ?? "";
+    const emittedSourceFile: EmittedSourceFile = {
+      path: sourceFile.path,
+      contents: builder.reduce() + `${preamble}\n`,
+    };
+
+    for (const decl of sourceFile.globalScope.declarations) {
+      if (decl.value === undefined || decl.value === "") continue;
+      emittedSourceFile.contents += decl.value + "\n";
+    }
+
+    const sfNs = this.buildNamespaceFromPath(sourceFile.path) ?? "";
+
+    // render deferred declarations
+    const deferredDeclarations = this.declarations!.filter((decl) => decl.isDeferred && decl.omit === false);
+    for (const item of deferredDeclarations) {
+      // only render deferred declarations that are in relevant to the source file
+      const itemNs = item.path.split(".").slice(0, -1).join(".");
+      if (itemNs !== sfNs) continue;
+
+      if (item.source?.kind === "Model") {
+        const props = this.emitter.emitModelProperties(item.source);
+        const modelCode = code`class ${item.name}(BaseModel):\n${props}`;
+        emittedSourceFile.contents += modelCode + "\n\n";
+      } else if (item.source?.kind === "Scalar") {
+        const scalarCode = this.emitScalar(item.source, item.name, sourceFile);
+        emittedSourceFile.contents += scalarCode + "\n\n";
+      }
+    }
+    return emittedSourceFile;
+  }
+
   /** Returns the asset emitter. */
   getAssetEmitter(): AssetEmitter<string, Record<string, never>> {
     return this.emitter;
+  }
+}
+
+export abstract class PythonPartialModelEmitter extends PythonPartialEmitter {
+  private fileName = "models.py";
+
+  programContext(program: Program): Context {
+    return this.createProgramContext(this.fileName);
+  }
+
+  namespaceContext(namespace: Namespace): Context {
+    if (namespace.name === "TypeSpec") {
+      return {};
+    }
+    this.emitter.createSourceFile(this.buildFilePath(namespace, "__init__.py"));
+    return this.createNamespaceContext(namespace, this.fileName);
+  }
+}
+
+export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter {
+  private fileName = "operations.py";
+
+  programContext(program: Program): Context {
+    return this.createProgramContext(this.fileName);
+  }
+
+  namespaceContext(namespace: Namespace): Context {
+    return this.createNamespaceContext(namespace, this.fileName);
   }
 }

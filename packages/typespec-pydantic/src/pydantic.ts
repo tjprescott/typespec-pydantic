@@ -1,4 +1,4 @@
-import { PythonPartialEmitter, ImportKind, DeclarationManager, DeclarationKind } from "typespec-python";
+import { ImportKind, DeclarationManager, DeclarationKind, PythonPartialModelEmitter } from "typespec-python";
 import {
   EmitContext,
   Enum,
@@ -6,11 +6,8 @@ import {
   Interface,
   Model,
   ModelProperty,
-  Namespace,
   Operation,
-  Program,
   Scalar,
-  Tuple,
   Type,
   Union,
   getDoc,
@@ -27,7 +24,6 @@ import {
 } from "@typespec/compiler";
 import {
   AssetEmitter,
-  Context,
   EmitEntity,
   EmittedSourceFile,
   EmitterOutput,
@@ -115,7 +111,7 @@ interface PydanticFieldMetadata {
   exclude?: boolean;
 }
 
-export class PydanticEmitter extends PythonPartialEmitter {
+export class PydanticEmitter extends PythonPartialModelEmitter {
   constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
     super(emitter);
     this.declarations = declarations;
@@ -246,74 +242,16 @@ export class PydanticEmitter extends PythonPartialEmitter {
     return builder;
   }
 
-  programContext(program: Program): Context {
-    const options = this.emitter.getOptions();
-    const outFile = options["output-file"] ?? "models.py";
-    const sourceFile = this.emitter.createSourceFile(outFile);
-    return {
-      scope: sourceFile.globalScope,
-    };
-  }
-
-  /** Create a new source file for each namespace. */
-  namespaceContext(namespace: Namespace): Context {
-    if (namespace.name === "TypeSpec") {
-      return {};
-    }
-    const fullPath = getNamespaceFullName(namespace)
-      .split(".")
-      .map((seg) => this.toSnakeCase(seg))
-      .join("/");
-    this.emitter.createSourceFile(`${fullPath}/__init__.py`);
-    const modelsFile = this.emitter.createSourceFile(`${fullPath}/models.py`);
-    return {
-      scope: modelsFile.globalScope,
-    };
-  }
-
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
-    const builder = new StringBuilder();
-
-    for (const [moduleName, names] of this.imports.getImports(sourceFile, ImportKind.regular)) {
-      builder.push(code`from ${moduleName} import ${[...names].join(", ")}\n`);
-    }
-
-    const deferredImports = this.imports.getImports(sourceFile, ImportKind.deferred);
-    if (deferredImports.size > 0) {
-      builder.push(code`\nif TYPE_CHECKING:\n`);
-      for (const [moduleName, names] of deferredImports) {
-        builder.push(code`${this.indent()}from ${moduleName} import ${[...names].join(", ")}\n`);
-      }
-    }
-
-    const emittedSourceFile: EmittedSourceFile = {
-      path: sourceFile.path,
-      contents: builder.reduce() + "\n",
-    };
-
-    for (const decl of sourceFile.globalScope.declarations) {
-      emittedSourceFile.contents += decl.value + "\n\n";
-    }
-
     const sfNs = this.buildNamespaceFromPath(sourceFile.path) ?? "";
-
-    const deferredDeclarations = this.declarations!.filter((decl) => decl.isDeferred && decl.omit === false);
+    const deferredDeclarations = this.declarations!.getDeferredDeclarations(sfNs);
     for (const item of deferredDeclarations) {
-      // only render deferred declarations that are in relevant to the source file
-      const itemNs = item.path.split(".").slice(0, -1).join(".");
-      if (itemNs !== sfNs) continue;
-
       if (item.source?.kind === "Model") {
         this.imports.add("pydantic", "BaseModel", ImportKind.regular, sourceFile);
-        const props = this.emitter.emitModelProperties(item.source);
-        const modelCode = code`class ${item.name}(BaseModel):\n${props}`;
-        emittedSourceFile.contents += modelCode + "\n\n";
-      } else if (item.source?.kind === "Scalar") {
-        const scalarCode = this.#emitScalar(item.source, item.name, sourceFile);
-        emittedSourceFile.contents += scalarCode + "\n\n";
+        break;
       }
     }
-    return emittedSourceFile;
+    return super.sourceFile(sourceFile);
   }
 
   circularReference(
@@ -508,7 +446,7 @@ export class PydanticEmitter extends PythonPartialEmitter {
     });
   }
 
-  #emitScalar(scalar: Scalar, name: string, sourceFile?: SourceFile<string>): string | Placeholder<string> {
+  emitScalar(scalar: Scalar, name: string, sourceFile?: SourceFile<string>): string | Placeholder<string> {
     const knownValues = getKnownValues(this.emitter.getProgram(), scalar);
     const builder = new StringBuilder();
     const baseScalarName = this.convertScalarName(this.getBaseScalar(scalar), undefined);
@@ -538,7 +476,7 @@ export class PydanticEmitter extends PythonPartialEmitter {
         return code`${converted}`;
       }
     }
-    return this.emitter.result.declaration(converted, this.#emitScalar(scalar, converted));
+    return this.emitter.result.declaration(converted, this.emitScalar(scalar, converted));
   }
 
   scalarInstantiation(scalar: Scalar, name: string | undefined): EmitterOutput<string> {

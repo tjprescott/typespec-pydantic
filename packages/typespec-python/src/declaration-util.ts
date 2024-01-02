@@ -73,4 +73,16 @@ export class DeclarationManager {
   filter(predicate: (decl: DeclarationMetadata) => boolean): DeclarationMetadata[] {
     return Array.from(this.declarations.values()).filter(predicate);
   }
+
+  getDeferredDeclarations(namespace: string): DeclarationMetadata[] {
+    const deferred: DeclarationMetadata[] = [];
+    for (const [_, decl] of this.declarations) {
+      if (!decl.isDeferred) continue;
+      if (decl.omit) continue;
+      const itemNs = decl.path.split(".").slice(0, -1).join(".");
+      if (itemNs !== namespace) continue;
+      deferred.push(decl);
+    }
+    return deferred;
+  }
 }
