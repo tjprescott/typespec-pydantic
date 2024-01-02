@@ -1,4 +1,7 @@
-import { JSONSchemaType, createTypeSpecLibrary, paramMessage } from "@typespec/compiler";
+import { anonymousModelRule } from "./rules/anonymous-model.js";
+import { JSONSchemaType, createTypeSpecLibrary } from "@typespec/compiler";
+import { emptyUnionRule } from "./rules/empty-union.js";
+import { intrinsicTypeUnsupportedRule } from "./rules/intrinsic-type-unsupported.js";
 
 export interface PydanticEmitterOptions {
   "output-file"?: string;
@@ -13,32 +16,27 @@ const PydanticEmitterOptionsSchema: JSONSchemaType<PydanticEmitterOptions> = {
   required: [],
 };
 
+const libName = "typespec-pydantic";
+
 export const $lib = createTypeSpecLibrary({
   name: "typespec-pydantic",
   diagnostics: {
-    "anonymous-model": {
-      severity: "warning",
-      messages: {
-        default: "Anonymous models are not supported. Consider extracting your anonymous model into a named model.",
-      },
-    },
-    "empty-union": {
+    "unexpected-error": {
       severity: "error",
       messages: {
-        default: "Unions must have at least one variant.",
+        default: "An unexpected error occurred. Please file an issue.",
       },
     },
-    "intrinsic-type-unsupported": {
-      severity: "warning",
-      messages: {
-        default: paramMessage`Intrinsic type '${"name"}' not recognized. Assuming 'object'. Please file an issue.`,
-        never: "Intrinsic type 'never' not supported in Pydantic. Property will be omitted.",
-      },
-    },
-    "invalid-discriminated-union": {
-      severity: "warning",
-      messages: {
-        default: "Found conflicting discriminators in union. Ensure all variants have the same discriminator.",
+  },
+  linter: {
+    rules: [anonymousModelRule, emptyUnionRule, intrinsicTypeUnsupportedRule],
+    ruleSets: {
+      all: {
+        enable: {
+          [`${libName}/${anonymousModelRule.name}`]: true,
+          [`${libName}/${emptyUnionRule.name}`]: true,
+          [`${libName}/${intrinsicTypeUnsupportedRule.name}`]: true,
+        },
       },
     },
   },

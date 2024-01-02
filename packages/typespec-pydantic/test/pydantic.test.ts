@@ -1,7 +1,7 @@
 import { expectDiagnosticEmpty, expectDiagnostics } from "@typespec/compiler/testing";
 import { compare, pydanticOutputFor } from "./test-host.js";
 
-describe("Pydantic", () => {
+describe("typespec-pydantic: core", () => {
   describe("models", () => {
     it("supports simple properties", async () => {
       const input = `
@@ -206,11 +206,7 @@ describe("Pydantic", () => {
             p3: object
             p4: None
         `;
-      const [result, diagnostics] = await pydanticOutputFor(input);
-      expectDiagnostics(diagnostics, {
-        code: "typespec-pydantic/intrinsic-type-unsupported",
-        message: "Intrinsic type 'never' not supported in Pydantic. Property will be omitted.",
-      });
+      const [result, _] = await pydanticOutputFor(input);
       compare(expect, result);
     });
 
@@ -360,7 +356,7 @@ describe("Pydantic", () => {
       compare(expect, result);
     });
 
-    it("emits warning and object for anonymous model properties", async () => {
+    it("emits `object` for anonymous model properties", async () => {
       const input = `
         model Widget {
             widgetPart: {
@@ -370,12 +366,7 @@ describe("Pydantic", () => {
       const expect = `
         class Widget(BaseModel):
             widget_part: object`;
-      const [result, diagnostics] = await pydanticOutputFor(input);
-      expectDiagnostics(diagnostics, [
-        {
-          code: "typespec-pydantic/anonymous-model",
-        },
-      ]);
+      const [result, _] = await pydanticOutputFor(input);
       compare(expect, result);
     });
 

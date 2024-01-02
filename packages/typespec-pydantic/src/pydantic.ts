@@ -450,11 +450,7 @@ class PydanticEmitter extends CodeTypeEmitter {
   }
 
   modelLiteral(model: Model): EmitterOutput<string> {
-    const program = this.emitter.getProgram();
-    reportDiagnostic(program, {
-      code: "anonymous-model",
-      target: model,
-    });
+    // Unsupported. See: `anonymous-model` rule
     return code`object`;
   }
 
@@ -590,11 +586,7 @@ class PydanticEmitter extends CodeTypeEmitter {
   intrinsic(intrinsic: IntrinsicType, name: string): EmitterOutput<string> {
     switch (name) {
       case "never":
-        reportDiagnostic(this.emitter.getProgram(), {
-          code: "intrinsic-type-unsupported",
-          target: intrinsic,
-          messageId: "never",
-        });
+        // Unsupported: See `intrinsic-type-unsupported` rule
         return this.emitter.result.none();
       case "unknown":
         return code`object`;
@@ -603,9 +595,8 @@ class PydanticEmitter extends CodeTypeEmitter {
         return code`None`;
       default:
         reportDiagnostic(this.emitter.getProgram(), {
-          code: "intrinsic-type-unsupported",
+          code: "unexpected-error",
           target: intrinsic,
-          format: { name: name },
         });
         return code`object`;
     }
@@ -791,7 +782,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     const hasNonLiterals = nonLiterals.length > 0;
     if (!hasLiterals && !hasNonLiterals) {
       reportDiagnostic(this.emitter.getProgram(), {
-        code: "empty-union",
+        code: "unexpected-error",
         target: union,
       });
     }
