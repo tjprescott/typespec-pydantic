@@ -16,6 +16,7 @@ const config = defineConfig(
       "@azure-tools/typespec-azure-resource-manager",
       "@azure-tools/typespec-client-generator-core",
       "typespec-pydantic",
+      "typespec-flask",
     ],
     samples: {
       "Basic Sample": {
