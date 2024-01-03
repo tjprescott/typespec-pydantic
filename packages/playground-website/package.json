@@ -67,8 +67,7 @@
     "es-module-shims": "~1.8.0",
     "react": "~18.2.0",
     "react-dom": "~18.2.0",
-    "typespec-pydantic": "workspace:~1.0.0-beta.1",
-    "typespec-flask": "workspace:~1.0.0-beta.1"
+    "typespec-pydantic": "workspace:~1.0.0-beta.1"
   },
   "devDependencies": {
     "@babel/core": "^7.22.20",
