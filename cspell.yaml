@@ -9,6 +9,7 @@ words:
   - Pydantic
   - cadl
   - repr
+  - regen
 ignorePaths:
   - "**/node_modules/**"
   - "**/dist/**"

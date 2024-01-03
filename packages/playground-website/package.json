@@ -34,6 +34,7 @@
   },
   "scripts": {
     "clean": "rimraf ./dist ./dist-dev ./temp ./samples/dist",
+    "purge": "npm run clean && rimraf ./node_modules",
     "build-samples": "node ./samples/build.js",
     "build": "npm run build-samples && tsc -p . && vite build 2>&1",
     "preview": "npm run build && vite preview",
