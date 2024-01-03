@@ -7,6 +7,7 @@ import {
   IntrinsicType,
   Model,
   ModelProperty,
+  Namespace,
   NumericLiteral,
   Operation,
   Program,
@@ -47,7 +48,7 @@ import { DeclarationManager } from "./declaration-util.js";
 export async function $onEmit(context: EmitContext<PydanticEmitterOptions>) {
   const assetEmitter = context.getAssetEmitter(PydanticEmitter);
 
-  assetEmitter.emitProgram();
+  assetEmitter.emitProgram({ emitTypeSpecNamespace: false });
 
   if (!context.program.compilerOptions.noEmit) {
     await assetEmitter.writeOutput();
@@ -396,11 +397,25 @@ class PydanticEmitter extends CodeTypeEmitter {
     };
   }
 
+  /** Create a new source file for each namespace. */
+  namespaceContext(namespace: Namespace): Context {
+    const fullName = getNamespaceFullName(namespace);
+    const outputFile = this.emitter.createSourceFile(`${this.#toSnakeCase(namespace.name)}.py`);
+    return {
+      scope: outputFile.globalScope,
+    };
+  }
+
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
     const emittedSourceFile: EmittedSourceFile = {
       path: sourceFile.path,
       contents: this.imports.emit(),
     };
+
+    if (sourceFile.globalScope.declarations.length === 0) {
+      emittedSourceFile.contents = "";
+      return emittedSourceFile;
+    }
 
     for (const decl of sourceFile.globalScope.declarations) {
       emittedSourceFile.contents += decl.value + "\n\n";
