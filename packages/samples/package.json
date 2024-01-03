@@ -1,0 +1,62 @@
+{
+  "name": "typespec-pydantic-samples",
+  "private": true,
+  "version": "1.0.0",
+  "author": "Microsoft Corporation",
+  "description": "Samples for TypeSpec Pydantic",
+  "homepage": "https://github.com/tjprescott/typespec-pydantic",
+  "readme": "https://github.com/tjprescott/typespec-pydantic/blob/master/README.md",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tjprescott/typespec-pydantic.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tjprescott/typespec-pydantic/issues"
+  },
+  "keywords": [
+    "typespec",
+    "python"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "clean": "rimraf ./dist ./temp",
+    "build": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "test": "mocha",
+    "test:regen": "cross-env RECORD=true mocha",
+    "regen-samples": "cross-env RECORD=true mocha"
+  },
+  "files": [
+    "lib/*.tsp",
+    "dist/**",
+    "!dist/test/**"
+  ],
+  "dependencies": {
+    "@typespec/compiler": "^0.50.0",
+    "@typespec/http": "^0.50.0",
+    "@typespec/openapi": "^0.50.0",
+    "@typespec/openapi3": "^0.50.0",
+    "@typespec/rest": "^0.50.0",
+    "typespec-pydantic": "workspace:~1.0.0-beta.1"
+  },
+  "devDependencies": {
+    "@types/mocha": "~10.0.1",
+    "@types/node": "~18.11.9",
+    "@typespec/eslint-config-typespec": "~0.50.0",
+    "cross-env": "~7.0.3",
+    "eslint": "^8.55.0",
+    "mocha": "~10.2.0",
+    "rimraf": "~5.0.5",
+    "typescript": "^5.3.3"
+  }
+}

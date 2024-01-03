@@ -9,8 +9,8 @@
       "request": "launch",
       "name": "Emit Scratch",
       "skipFiles": ["<node_internals>/**"],
-      "program": "${workspaceFolder}/node_modules/@typespec/compiler/entrypoints/cli.js",
-      "args": ["compile", "${workspaceFolder}/packages/samples/scratch/main.tsp", "--emit=${workspaceFolder}"]
+      "program": "${workspaceFolder}/packages/typespec-pydantic/node_modules/@typespec/compiler/entrypoints/cli.js",
+      "args": ["compile", "${workspaceFolder}/packages/samples/scratch/main.tsp"]
     }
   ]
 }
