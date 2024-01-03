@@ -49,7 +49,9 @@ export async function $onEmit(context: EmitContext<PydanticEmitterOptions>) {
 
   assetEmitter.emitProgram();
 
-  await assetEmitter.writeOutput();
+  if (!context.program.compilerOptions.noEmit) {
+    await assetEmitter.writeOutput();
+  }
 }
 
 interface UnionVariantMetadata {
