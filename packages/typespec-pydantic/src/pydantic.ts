@@ -16,6 +16,7 @@ import {
   Tuple,
   Type,
   Union,
+  emitFile,
   getDiscriminator,
   getDoc,
   getKnownValues,
@@ -49,9 +50,7 @@ export async function $onEmit(context: EmitContext<PydanticEmitterOptions>) {
 
   assetEmitter.emitProgram({ emitTypeSpecNamespace: false });
 
-  if (!context.program.compilerOptions.noEmit) {
-    await assetEmitter.writeOutput();
-  }
+  await assetEmitter.writeOutput();
 }
 
 interface UnionVariantMetadata {
@@ -413,6 +412,7 @@ class PydanticEmitter extends CodeTypeEmitter {
 
   /** Create a new source file for each namespace. */
   namespaceContext(namespace: Namespace): Context {
+    this.emitter.createSourceFile(`__init__.py`);
     const fullName = getNamespaceFullName(namespace);
     const outputFile = this.emitter.createSourceFile(`${this.#toSnakeCase(namespace.name)}.py`);
     return {
@@ -451,6 +451,27 @@ class PydanticEmitter extends CodeTypeEmitter {
       }
     }
     return emittedSourceFile;
+  }
+
+  async writeOutput(sourceFiles: SourceFile<string>[]): Promise<void> {
+    const toEmit: EmittedSourceFile[] = [];
+
+    for (const sf of sourceFiles) {
+      const emittedSf = await this.emitter.emitSourceFile(sf);
+
+      if (sf.globalScope.declarations.length > 0 || sf.path.endsWith("__init__.py")) {
+        toEmit.push(emittedSf);
+      }
+    }
+
+    if (!this.emitter.getProgram().compilerOptions.noEmit) {
+      for (const emittedSf of toEmit) {
+        await emitFile(this.emitter.getProgram(), {
+          path: emittedSf.path,
+          content: emittedSf.contents,
+        });
+      }
+    }
   }
 
   #emitDocs(builder: StringBuilder, type: Type) {

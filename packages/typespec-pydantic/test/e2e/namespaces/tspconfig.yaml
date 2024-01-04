@@ -1,0 +1,5 @@
+emit:
+  - typespec-pydantic
+options:
+  typespec-pydantic:
+    emitter-output-dir: "{project-root}/generated"

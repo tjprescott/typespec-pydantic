@@ -1,4 +1,4 @@
-import { expectDiagnosticEmpty, expectDiagnostics } from "@typespec/compiler/testing";
+import { expectDiagnosticEmpty } from "@typespec/compiler/testing";
 import { compare, pydanticOutputFor } from "./test-host.js";
 
 describe("typespec-pydantic: core", () => {
