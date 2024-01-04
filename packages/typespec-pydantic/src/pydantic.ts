@@ -44,6 +44,7 @@ import {
 import { PydanticEmitterOptions, reportDiagnostic } from "./lib.js";
 import { getFields } from "./decorators.js";
 import { DeclarationManager } from "./declaration-util.js";
+import { SourceMap } from "module";
 
 export async function $onEmit(context: EmitContext<PydanticEmitterOptions>) {
   const assetEmitter = context.getAssetEmitter(PydanticEmitter);
@@ -258,8 +259,8 @@ class PydanticEmitter extends CodeTypeEmitter {
     return this.declarations.isDeclared(name);
   }
 
-  #declare(name: string, value: string | StringBuilder | undefined) {
-    this.declarations.declare(name);
+  #declare(name: string, value: string | StringBuilder | undefined, kind: "model" | "namespace" = "model") {
+    this.declarations.declare(name, kind);
     return this.emitter.result.declaration(name, value ?? "");
   }
 
@@ -412,12 +413,26 @@ class PydanticEmitter extends CodeTypeEmitter {
 
   /** Create a new source file for each namespace. */
   namespaceContext(namespace: Namespace): Context {
-    this.emitter.createSourceFile(`__init__.py`);
-    const fullName = getNamespaceFullName(namespace);
-    const outputFile = this.emitter.createSourceFile(`${this.#toSnakeCase(namespace.name)}.py`);
+    if (namespace.name === "TypeSpec") {
+      return {
+        scope: undefined,
+      };
+    }
+    const fullPath = getNamespaceFullName(namespace)
+      .split(".")
+      .map((seg) => this.#toSnakeCase(seg))
+      .join("/");
+    this.emitter.createSourceFile(`${fullPath}/__init__.py`);
+    const outputFile = this.emitter.createSourceFile(`${fullPath}/models.py`);
     return {
       scope: outputFile.globalScope,
     };
+  }
+
+  namespace(namespace: Namespace): EmitterOutput<string> {
+    // emit nothing but register the namespace as a declaration
+    super.namespace(namespace);
+    return this.#declare(this.#toSnakeCase(namespace.name), undefined, "namespace");
   }
 
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
@@ -453,15 +468,69 @@ class PydanticEmitter extends CodeTypeEmitter {
     return emittedSourceFile;
   }
 
+  /** Matches __init__.py and models.py files together */
+  #matchSourceFiles(sourceFiles: SourceFile<string>[]): [SourceFile<string>, SourceFile<string>][] {
+    const matchedFiles = new Map<string, SourceFile<string>[]>();
+    for (const sf of sourceFiles) {
+      const path = sf.path;
+      const dir = path.substring(0, path.lastIndexOf("/"));
+      const files = matchedFiles.get(dir) ?? [];
+      // if this is an __init__.py file, add it to the end
+      if (path.endsWith("__init__.py")) {
+        files.push(sf);
+      } else {
+        // otherwise add it to the beginning
+        files.unshift(sf);
+      }
+      matchedFiles.set(dir, files);
+    }
+    return [...matchedFiles.values()].map((files) => [files[0], files[1]]);
+  }
+
+  async #emitInitFile(initFile: SourceFile<string>, modelFile: SourceFile<string>): Promise<EmittedSourceFile> {
+    const initSf = await this.emitter.emitSourceFile(initFile);
+    const models: string[] = [];
+    const subnamespaces: string[] = [];
+    for (const decl of modelFile.globalScope.declarations) {
+      const metadata = this.declarations.getMetadata(decl.name);
+      if (metadata === undefined) {
+        throw new Error(`Expected metadata for ${decl.name}`);
+      }
+      if (metadata.kind === "model") {
+        models.push(decl.name);
+      } else if (metadata.kind === "namespace") {
+        subnamespaces.push(decl.name);
+      }
+    }
+    const builder = new StringBuilder();
+    if (models.length > 0) {
+      builder.push(code`from .models import ${[...models].join(", ")}\n`);
+    }
+    if (subnamespaces.length > 0) {
+      builder.push(code`from . import ${[...subnamespaces].join(", ")}\n`);
+    }
+    if (models.length + subnamespaces.length > 0) {
+      const quoted = [...models, ...subnamespaces].map((name) => `"${name}"`);
+      builder.push(code`\n__all__ = [${[...quoted].join(", ")}]\n`);
+    }
+    initSf.contents = builder.reduce() + "\n" + initSf.contents;
+    return initSf;
+  }
+
   async writeOutput(sourceFiles: SourceFile<string>[]): Promise<void> {
     const toEmit: EmittedSourceFile[] = [];
 
-    for (const sf of sourceFiles) {
-      const emittedSf = await this.emitter.emitSourceFile(sf);
-
-      if (sf.globalScope.declarations.length > 0 || sf.path.endsWith("__init__.py")) {
-        toEmit.push(emittedSf);
+    const sortedFiles = this.#matchSourceFiles(sourceFiles);
+    for (const [modelFile, initFile] of sortedFiles) {
+      if (initFile === undefined) {
+        continue;
       }
+      const modelSf = await this.emitter.emitSourceFile(modelFile);
+      if (modelFile.globalScope.declarations.length === 0) {
+        continue;
+      }
+      toEmit.push(modelSf);
+      toEmit.push(await this.#emitInitFile(initFile, modelFile));
     }
 
     if (!this.emitter.getProgram().compilerOptions.noEmit) {
