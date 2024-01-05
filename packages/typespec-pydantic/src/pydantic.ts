@@ -253,8 +253,8 @@ class PydanticEmitter extends CodeTypeEmitter {
     return this.declarations.isDeclared(name);
   }
 
-  #declare(name: string, value: string | StringBuilder | undefined, kind: "model" | "namespace" = "model") {
-    this.declarations.declare(name, kind);
+  #declare(name: string, value: string | StringBuilder | undefined) {
+    this.declarations.declare(name);
     return this.emitter.result.declaration(name, value ?? "");
   }
 
@@ -287,7 +287,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     } else if (value === null) {
       return code`None`;
     } else {
-      return code`${this.#emitTypeReference(value as Type)}`;
+      return code`${this.emitter.emitTypeReference(value as Type)}`;
     }
   }
 
@@ -421,15 +421,6 @@ class PydanticEmitter extends CodeTypeEmitter {
     };
   }
 
-  namespace(namespace: Namespace): EmitterOutput<string> {
-    // emit nothing but register the namespace as a declaration
-    super.namespace(namespace);
-    for (const [name, _] of namespace.namespaces) {
-      this.#declare(this.#toSnakeCase(name), undefined, "namespace");
-    }
-    return this.emitter.result.declaration(namespace.name, "");
-  }
-
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
     const builder = new StringBuilder();
     for (const [moduleName, names] of sourceFile.imports.entries()) {
@@ -479,28 +470,11 @@ class PydanticEmitter extends CodeTypeEmitter {
 
   async #emitInitFile(initFile: SourceFile<string>, modelFile: SourceFile<string>): Promise<EmittedSourceFile> {
     const initSf = await this.emitter.emitSourceFile(initFile);
-    const models: string[] = [];
-    const subnamespaces: string[] = [];
-    for (const decl of modelFile.globalScope.declarations) {
-      const metadata = this.declarations.getMetadata(decl.name);
-      if (metadata === undefined) {
-        throw new Error(`Expected metadata for ${decl.name}`);
-      }
-      if (metadata.kind === "model") {
-        models.push(decl.name);
-      } else if (metadata.kind === "namespace") {
-        subnamespaces.push(decl.name);
-      }
-    }
+    const models = modelFile.globalScope.declarations.map((decl) => decl.name);
     const builder = new StringBuilder();
     if (models.length > 0) {
       builder.push(code`from .models import ${[...models].join(", ")}\n`);
-    }
-    if (subnamespaces.length > 0) {
-      builder.push(code`from . import ${[...subnamespaces].join(", ")}\n`);
-    }
-    if (models.length + subnamespaces.length > 0) {
-      const quoted = [...models, ...subnamespaces].map((name) => `"${name}"`);
+      const quoted = [...models].map((name) => `"${name}"`);
       builder.push(code`\n__all__ = [${[...quoted].join(", ")}]\n`);
     }
     initSf.contents = builder.reduce() + "\n" + initSf.contents;
@@ -533,33 +507,20 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
   }
 
-  #emitTypeReference(type: Type): EmitEntity<string> {
-    return this.emitter.emitTypeReference(type);
-  }
-
-  #buildTargetPath(source: Scope<string>, dest: Scope<string>): string {
-    if (source.kind !== "sourceFile" || dest.kind !== "sourceFile") {
+  #buildTargetPath(dest: Scope<string>): string {
+    if (dest.kind !== "sourceFile") {
       throw new Error("Expected source and dest to be source files");
     }
     const outputDir = this.emitter.getOptions().emitterOutputDir;
-    let sourcePath = source.sourceFile.path;
     let destPath = dest.sourceFile.path;
-    if (!sourcePath.startsWith(outputDir) || !destPath.startsWith(outputDir)) {
+    if (!destPath.startsWith(outputDir)) {
       throw new Error("Expected source and dest to be in the output directory");
-    }
-    sourcePath = sourcePath.substring(outputDir.length);
-    if (sourcePath.startsWith("/")) {
-      sourcePath = sourcePath.substring(1);
     }
     destPath = destPath.substring(outputDir.length);
     if (destPath.startsWith("/")) {
       destPath = destPath.substring(1);
     }
-    // split on / and remove the last segment (the file name)
-    const sourceSegments = sourcePath.split("/").slice(0, -1);
-    const destSegments = destPath.split("/").slice(0, -1);
-    throw new Error("Not implemented");
-    return ".";
+    return destPath.split("/").slice(0, -1).join(".");
   }
 
   reference(
@@ -569,15 +530,10 @@ class PydanticEmitter extends CodeTypeEmitter {
     commonScope: Scope<string> | null,
   ): string | EmitEntity<string> {
     const targetName = targetDeclaration.name;
-    if (pathUp.length > 1) {
-      throw new Error("pathUp larger than expected");
-    }
     if (pathDown.length > 1) {
       throw new Error("pathDown larger than expected");
     }
-    const source = pathUp[0];
-    const dest = pathDown[0];
-    const targetPath = this.#buildTargetPath(source, dest);
+    const targetPath = this.#buildTargetPath(pathDown[0]);
     this.#addImport(targetPath, targetName);
     return super.reference(targetDeclaration, pathUp, pathDown, commonScope);
   }
@@ -622,7 +578,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     if (model.name === "Record") {
       const type = model.templateMapper?.args[0];
       this.#addImport("typing", "Dict");
-      return code`Dict[str, ${type ? this.#emitTypeReference(type) : "None"}]`;
+      return code`Dict[str, ${type ? this.emitter.emitTypeReference(type) : "None"}]`;
     } else {
       const modelName = this.#checkName(name ?? model.name);
       if (this.#isDeclared(modelName)) {
@@ -647,7 +603,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     const isOptional = property.optional;
     const knownValues = getKnownValues(this.emitter.getProgram(), property);
     let type: EmitEntity<string> | undefined = undefined;
-    type = this.#emitTypeReference(property.type);
+    type = this.emitter.emitTypeReference(property.type);
     // don't emit anything if type is `never`
     if (property.type.kind === "Intrinsic" && property.type.name === "never") return code``;
 
@@ -664,7 +620,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     if (property.type.kind === "Union") {
       builder.push(code`${this.emitter.emitUnionVariants(property.type)}`);
     } else if (property.type.kind === "UnionVariant") {
-      builder.push(code`${this.#emitTypeReference(property.type.type)}`);
+      builder.push(code`${this.emitter.emitTypeReference(property.type.type)}`);
     } else if (property.type.kind === "Scalar" && knownValues !== undefined) {
       builder.push(code`Union[${type}, ${knownValues.name}]`);
     } else {
@@ -683,7 +639,7 @@ class PydanticEmitter extends CodeTypeEmitter {
   }
 
   modelPropertyReference(property: ModelProperty): EmitterOutput<string> {
-    return code`${this.#emitTypeReference(property.type)}`;
+    return code`${this.emitter.emitTypeReference(property.type)}`;
   }
 
   enumDeclaration(en: Enum, name: string): EmitterOutput<string> {
@@ -723,7 +679,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     this.#addImport("pydantic", "RootModel");
     this.#addImport("typing", "List");
     builder.push(code`class ${name}(RootModel):\n`);
-    builder.push(code`${this.#indent()}root: List[${this.#emitTypeReference(elementType)}]\n\n`);
+    builder.push(code`${this.#indent()}root: List[${this.emitter.emitTypeReference(elementType)}]\n\n`);
     builder.push(code`${this.#indent()}def __iter__(self):\n${this.#indent(2)}return iter(self.root)\n\n`);
     builder.push(code`${this.#indent()}def __getitem__(self, item):\n${this.#indent(2)}return self.root[item]\n\n`);
     return this.#declare(name, builder.reduce());
@@ -731,7 +687,7 @@ class PydanticEmitter extends CodeTypeEmitter {
 
   arrayLiteral(array: Model, elementType: Type): EmitterOutput<string> {
     this.#addImport("typing", "List");
-    return code`List[${this.#emitTypeReference(elementType)}]`;
+    return code`List[${this.emitter.emitTypeReference(elementType)}]`;
   }
 
   booleanLiteral(boolean: BooleanLiteral): EmitterOutput<string> {
@@ -896,7 +852,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     this.#addImport("typing", "Tuple");
     builder.push(code`Tuple[`);
     for (const item of tuple.values) {
-      builder.push(code`${this.#emitTypeReference(item)}`);
+      builder.push(code`${this.emitter.emitTypeReference(item)}`);
       if (++i < length) builder.push(code`, `);
       else builder.push(code`]`);
     }
@@ -930,11 +886,11 @@ class PydanticEmitter extends CodeTypeEmitter {
       if (isLiteral) {
         literals.push({
           type: variant.type,
-          value: code`${this.#emitTypeReference(variant.type)}`,
+          value: code`${this.emitter.emitTypeReference(variant.type)}`,
         });
       } else {
         // value is already represented in nonLiterals array, don't add it again
-        const value = code`${this.#emitTypeReference(variant.type)}`;
+        const value = code`${this.emitter.emitTypeReference(variant.type)}`;
         if (nonLiterals.some((val) => val.value === value)) continue;
         nonLiterals.push({
           type: variant.type,

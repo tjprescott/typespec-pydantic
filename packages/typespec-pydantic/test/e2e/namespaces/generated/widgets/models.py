@@ -6,3 +6,6 @@ class Widget(BaseModel):
     name: str
 
     parts: List[Part]
+
+
+
