@@ -424,7 +424,10 @@ class PydanticEmitter extends CodeTypeEmitter {
   namespace(namespace: Namespace): EmitterOutput<string> {
     // emit nothing but register the namespace as a declaration
     super.namespace(namespace);
-    return this.#declare(this.#toSnakeCase(namespace.name), undefined, "namespace");
+    for (const [name, _] of namespace.namespaces) {
+      this.#declare(this.#toSnakeCase(name), undefined, "namespace");
+    }
+    return this.emitter.result.declaration(namespace.name, "");
   }
 
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
@@ -534,6 +537,31 @@ class PydanticEmitter extends CodeTypeEmitter {
     return this.emitter.emitTypeReference(type);
   }
 
+  #buildTargetPath(source: Scope<string>, dest: Scope<string>): string {
+    if (source.kind !== "sourceFile" || dest.kind !== "sourceFile") {
+      throw new Error("Expected source and dest to be source files");
+    }
+    const outputDir = this.emitter.getOptions().emitterOutputDir;
+    let sourcePath = source.sourceFile.path;
+    let destPath = dest.sourceFile.path;
+    if (!sourcePath.startsWith(outputDir) || !destPath.startsWith(outputDir)) {
+      throw new Error("Expected source and dest to be in the output directory");
+    }
+    sourcePath = sourcePath.substring(outputDir.length);
+    if (sourcePath.startsWith("/")) {
+      sourcePath = sourcePath.substring(1);
+    }
+    destPath = destPath.substring(outputDir.length);
+    if (destPath.startsWith("/")) {
+      destPath = destPath.substring(1);
+    }
+    // split on / and remove the last segment (the file name)
+    const sourceSegments = sourcePath.split("/").slice(0, -1);
+    const destSegments = destPath.split("/").slice(0, -1);
+    throw new Error("Not implemented");
+    return ".";
+  }
+
   reference(
     targetDeclaration: Declaration<string>,
     pathUp: Scope<string>[],
@@ -541,17 +569,15 @@ class PydanticEmitter extends CodeTypeEmitter {
     commonScope: Scope<string> | null,
   ): string | EmitEntity<string> {
     const targetName = targetDeclaration.name;
-    let targetPath = "";
-    if (pathUp.length > 0) {
-      targetPath = pathUp.map((scope) => "..").join("/");
-      targetPath += "/";
+    if (pathUp.length > 1) {
+      throw new Error("pathUp larger than expected");
     }
-    if (pathDown.length > 0) {
-      if (targetPath === "") {
-        targetPath += ".";
-      }
-      targetPath += pathDown.map((scope) => this.#toSnakeCase(scope.name)).join(".");
+    if (pathDown.length > 1) {
+      throw new Error("pathDown larger than expected");
     }
+    const source = pathUp[0];
+    const dest = pathDown[0];
+    const targetPath = this.#buildTargetPath(source, dest);
     this.#addImport(targetPath, targetName);
     return super.reference(targetDeclaration, pathUp, pathDown, commonScope);
   }

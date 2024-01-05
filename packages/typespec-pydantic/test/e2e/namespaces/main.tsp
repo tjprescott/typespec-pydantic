@@ -1,13 +1,15 @@
-namespace Widgets {
-
-  namespace Parts {
-    model Part {
-      name: string;
-    }
+namespace A {
+  model AModel {
+    prop: string;
   }
-
-  model Widget {
-    name: string;
-    parts: Parts.Part[];
+  namespace B {
+    model BModel {
+      prop: string;
+    }
+    namespace C {
+      model CModel {
+        prop: string;
+      } 
+    }
   }
 }
