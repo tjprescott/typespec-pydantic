@@ -2,7 +2,7 @@
 tsp-output
 packages/samples/scratch
 **/temp/
-
+*.pyc
 
 # scratch folder
 test/samples/scratch
