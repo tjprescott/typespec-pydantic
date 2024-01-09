@@ -1,7 +1,105 @@
 import { expectDiagnosticEmpty } from "@typespec/compiler/testing";
 import { compare, pydanticOutputFor } from "./test-host.js";
+import { strictEqual } from "assert";
 
 describe("typespec-pydantic: core", () => {
+  describe("namespaces", () => {
+    it("namespaces as packages", async () => {
+      const input = `
+      namespace A {
+        model ModelA {
+          name: string;
+          b?: B.ModelB;
+          c?: B.C.ModelC;
+        }
+
+        namespace B {
+          model ModelB {
+            name: string;
+            a?: ModelA;
+            c?: C.ModelC;
+          }
+
+          namespace C {
+            model ModelC {
+              name: string;
+              a?: ModelA;
+              b?: ModelB;
+            }
+          }
+        }
+      }
+      `;
+      const aInitExpect = `
+      from .models import ModelA
+
+      __all__ = ["ModelA"]
+      `;
+      const aModelExpect = `
+      from pydantic import BaseModel, Field
+      from a.b import ModelB
+      from typing import Optional, TYPE_CHECKING
+
+      if TYPE_CHECKING:
+          from a.b.c import ModelC
+
+      class ModelA(BaseModel):
+          name: str
+
+          b: Optional[ModelB] = Field(default=None)
+
+          c: Optional["ModelC"] = Field(default=None)
+      `;
+      const bInitExpect = `
+      from .models import ModelB
+
+      __all__ = ["ModelB"]
+      `;
+      const bModelExpect = `
+      from pydantic import BaseModel, Field
+      from typing import Optional, TYPE_CHECKING
+
+      if TYPE_CHECKING:
+          from a import ModelA
+          from a.b.c import ModelC
+
+      class ModelB(BaseModel):
+          name: str
+
+          a: Optional["ModelA"] = Field(default=None)
+
+          c: Optional["ModelC"] = Field(default=None)
+      `;
+      const cInitExpect = `
+      from .models import ModelC
+
+      __all__ = ["ModelC"]
+      `;
+      const cModelExpect = `
+      from pydantic import BaseModel, Field
+      from a import ModelA
+      from a.b import ModelB
+      from typing import Optional
+
+      class ModelC(BaseModel):
+          name: str
+
+          a: Optional[ModelA] = Field(default=None)
+
+          b: Optional[ModelB] = Field(default=None)
+      `;
+      const [results, diagnostics] = await pydanticOutputFor(input);
+      expectDiagnosticEmpty(diagnostics);
+      strictEqual(results.length, 6);
+      compare(aModelExpect, results[0].contents, false);
+      compare(aInitExpect, results[1].contents, false);
+      compare(bModelExpect, results[2].contents, false);
+      compare(bInitExpect, results[3].contents, false);
+      compare(cModelExpect, results[4].contents, false);
+      compare(cInitExpect, results[5].contents, false);
+    });
+  });
+
   describe("models", () => {
     it("supports simple properties", async () => {
       const input = `
@@ -23,7 +121,7 @@ describe("typespec-pydantic: core", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports @knownValues", async () => {
@@ -46,7 +144,7 @@ describe("typespec-pydantic: core", () => {
             CIRCLE = Field(default="circle", frozen=True)`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports documentation with @doc", async () => {
@@ -65,7 +163,7 @@ describe("typespec-pydantic: core", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports documentation with doc comment", async () => {
@@ -100,7 +198,7 @@ describe("typespec-pydantic: core", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports string constraints", async () => {
@@ -118,7 +216,7 @@ describe("typespec-pydantic: core", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("transforms names that start with reserved keywords", async () => {
@@ -138,7 +236,7 @@ describe("typespec-pydantic: core", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("transforms names that start with numbers", async () => {
@@ -152,7 +250,7 @@ describe("typespec-pydantic: core", () => {
             _1: str`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports default values", async () => {
@@ -173,7 +271,7 @@ describe("typespec-pydantic: core", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports readonly values", async () => {
@@ -188,7 +286,7 @@ describe("typespec-pydantic: core", () => {
             name: str = Field(default="Widget", frozen=True)`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("support intrinsic types", async () => {
@@ -207,7 +305,7 @@ describe("typespec-pydantic: core", () => {
             p4: None
         `;
       const [result, _] = await pydanticOutputFor(input);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports property references", async () => {
@@ -229,7 +327,7 @@ describe("typespec-pydantic: core", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports literal properties", async () => {
@@ -248,7 +346,7 @@ describe("typespec-pydantic: core", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports array properties", async () => {
@@ -263,7 +361,7 @@ describe("typespec-pydantic: core", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports array declaration as RootModel", async () => {
@@ -288,7 +386,7 @@ describe("typespec-pydantic: core", () => {
             parts: WidgetParts`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports array declaration aliases", async () => {
@@ -304,7 +402,7 @@ describe("typespec-pydantic: core", () => {
             parts: List[str]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports tuple properties", async () => {
@@ -318,7 +416,7 @@ describe("typespec-pydantic: core", () => {
             parts: Tuple[str, int, List[float]]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports class reference properties", async () => {
@@ -340,7 +438,7 @@ describe("typespec-pydantic: core", () => {
             parts: List[WidgetPart]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports dict properties", async () => {
@@ -353,7 +451,7 @@ describe("typespec-pydantic: core", () => {
             properties: Dict[str, str]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("emits `object` for anonymous model properties", async () => {
@@ -367,7 +465,7 @@ describe("typespec-pydantic: core", () => {
         class Widget(BaseModel):
             widget_part: object`;
       const [result, _] = await pydanticOutputFor(input);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("converts camelCase properties to snake_case", async () => {
@@ -380,7 +478,7 @@ describe("typespec-pydantic: core", () => {
             some_weird_casing: str`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports optional properties", async () => {
@@ -393,7 +491,7 @@ describe("typespec-pydantic: core", () => {
             name: Optional[str] = Field(default=None)`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports named template instantiations", async () => {
@@ -408,7 +506,7 @@ describe("typespec-pydantic: core", () => {
             contents: str`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports anonymous template instantiations", async () => {
@@ -428,7 +526,7 @@ describe("typespec-pydantic: core", () => {
             contents: str`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports union instantiations", async () => {
@@ -445,7 +543,7 @@ describe("typespec-pydantic: core", () => {
             widget: Union[str]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports discriminated unions", async () => {
@@ -482,7 +580,7 @@ describe("typespec-pydantic: core", () => {
             shape: Union[Circle, Square] = Field(discriminator="kind")`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports extends relationship", async () => {
@@ -519,7 +617,7 @@ describe("typespec-pydantic: core", () => {
             shape: Shape = Field(discriminator="kind")`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
   });
 
@@ -536,7 +634,7 @@ describe("typespec-pydantic: core", () => {
             name: str`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
   });
 
@@ -555,7 +653,7 @@ describe("typespec-pydantic: core", () => {
             name: str`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
   });
 
@@ -594,7 +692,7 @@ describe("typespec-pydantic: core", () => {
             color: Optional[WidgetColor] = Field(default=None)`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports documentation with @doc", async () => {
@@ -620,7 +718,7 @@ describe("typespec-pydantic: core", () => {
             """This is a pyramid."""`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports documentation with doc comments", async () => {
@@ -646,7 +744,7 @@ describe("typespec-pydantic: core", () => {
             """This is a pyramid."""`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports enum member references", async () => {
@@ -670,7 +768,7 @@ describe("typespec-pydantic: core", () => {
             CIRCLE = Field(default="Sphere", frozen=True)`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
   });
 
@@ -691,7 +789,7 @@ describe("typespec-pydantic: core", () => {
             mixed: Optional[Union[Literal["moo"], int]] = Field(default=None)`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports union declarations as properties", async () => {
@@ -730,7 +828,7 @@ describe("typespec-pydantic: core", () => {
             mixed: Union[Literal[1, 2, "void"], bool]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
   });
 
@@ -749,7 +847,7 @@ describe("typespec-pydantic: core", () => {
         MyStringString = Annotated[str, Field()]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports scalar declarations", async () => {
@@ -768,7 +866,7 @@ describe("typespec-pydantic: core", () => {
             name: MyString`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("translates TypeSpec scalars to Python types", async () => {
@@ -793,7 +891,7 @@ describe("typespec-pydantic: core", () => {
             date_time: datetime`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("avoids collisions with reserved Python names", async () => {
@@ -811,7 +909,7 @@ describe("typespec-pydantic: core", () => {
             id: Id`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
 
     it("supports @knownValues", async () => {
@@ -838,7 +936,7 @@ describe("typespec-pydantic: core", () => {
             CIRCLE = Field(default="circle", frozen=True)`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, result[0].contents);
     });
   });
 
@@ -861,7 +959,7 @@ describe("typespec-pydantic: core", () => {
               cost: float = Field(decimal_places=2, max_digits=5)`;
         const [result, diagnostics] = await pydanticOutputFor(input);
         expectDiagnosticEmpty(diagnostics);
-        compare(expect, result);
+        compare(expect, result[0].contents);
       });
     });
   });

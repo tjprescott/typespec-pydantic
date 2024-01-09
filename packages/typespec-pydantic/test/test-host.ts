@@ -1,7 +1,12 @@
-import { createTestHost, createTestWrapper, resolveVirtualPath } from "@typespec/compiler/testing";
+import { BasicTestRunner, createTestHost, createTestWrapper, resolveVirtualPath } from "@typespec/compiler/testing";
 import { PydanticTestLibrary } from "../src/testing/index.js";
 import { strictEqual } from "assert";
 import { Diagnostic } from "@typespec/compiler";
+
+export interface PydanticOutput {
+  path: string;
+  contents: string[];
+}
 
 export async function createPydanticTestHost() {
   return createTestHost({
@@ -19,7 +24,19 @@ export async function createPydanticTestRunner() {
   });
 }
 
-export async function pydanticOutputFor(code: string): Promise<[string[], readonly Diagnostic[]]> {
+async function readFilesInDirRecursively(runner: BasicTestRunner, dir: string): Promise<string[]> {
+  const files: string[] = [];
+  for (const entry of await runner.program.host.readDir(dir)) {
+    if (entry.endsWith(".py")) {
+      files.push(`${dir}/${entry}`);
+    } else {
+      files.push(...(await readFilesInDirRecursively(runner, `${dir}/${entry}`)));
+    }
+  }
+  return files;
+}
+
+export async function pydanticOutputFor(code: string): Promise<[PydanticOutput[], readonly Diagnostic[]]> {
   const runner = await createPydanticTestRunner();
   const outPath = resolveVirtualPath("/test.py");
   const [_, diagnostics] = await runner.compileAndDiagnose(code, {
@@ -27,8 +44,22 @@ export async function pydanticOutputFor(code: string): Promise<[string[], readon
     emitters: { "typespec-pydantic": { "output-file": outPath } },
     miscOptions: { "disable-linter": true },
   });
-  const rawText = runner.fs.get(outPath);
-  return [rawText ? rawText.split("\n") : [], diagnostics];
+  const emitterOutputDir = runner.program.emitters[0].emitterOutputDir;
+  const results: PydanticOutput[] = [];
+  if (runner.fs.get(outPath) === undefined) {
+    const files = await readFilesInDirRecursively(runner, emitterOutputDir);
+    for (const path of files) {
+      const rawText = runner.fs.get(resolveVirtualPath(path));
+      const lines = rawText ? rawText.split("\n") : [];
+      results.push({ path: path, contents: lines });
+    }
+  } else {
+    // return a single file
+    const rawText = runner.fs.get(outPath);
+    const lines = rawText ? rawText.split("\n") : [];
+    results.push({ path: outPath, contents: lines });
+  }
+  return [results, diagnostics];
 }
 
 function getIndent(lines: string[]): number {
