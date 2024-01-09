@@ -1,0 +1,76 @@
+{
+  "name": "typespec-python-server",
+  "version": "1.0.0-beta.1",
+  "author": "Microsoft Corporation",
+  "description": "Python webapp server emitter for TypeSpec",
+  "homepage": "https://github.com/tjprescott/typespec-pydantic",
+  "readme": "https://github.com/tjprescott/typespec-pydantic/blob/master/README.md",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tjprescott/typespec-pydantic.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tjprescott/typespec-pydantic/issues"
+  },
+  "keywords": [
+    "typespec",
+    "python"
+  ],
+  "type": "module",
+  "main": "dist/src/index.js",
+  "exports": {
+    ".": {
+      "default": "./dist/src/index.js",
+      "types": "./dist/src/index.d.ts"
+    },
+    "./testing": {
+      "default": "./dist/src/testing/index.js",
+      "types": "./dist/src/testing/index.d.ts"
+    }
+  },
+  "tspMain": "lib/main.tsp",
+  "scripts": {
+    "clean": "rimraf ./dist ./temp",
+    "build": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "lint": "eslint . --ext .ts --max-warnings=0",
+    "format": "npm run -s prettier -- --write",
+    "check-format": "npm run -s prettier -- --check",
+    "cspell": "cspell \"**/*.md\" \"**/*.ts\" \"**/*.tsp\"",
+    "test": "mocha"
+  },
+  "peerDependencies": {
+    "@typespec/compiler": "^0.50.0",
+    "@typespec/http": "^0.50.0",
+    "@typespec/rest": "^0.50.0"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.1",
+    "@types/node": "~18.11.9",
+    "@typespec/prettier-plugin-typespec": "~0.50.0",
+    "@typespec/eslint-config-typespec": "~0.50.0",
+    "@types/mocha": "~10.0.1",
+    "source-map-support": "^0.5.21",
+    "cspell": "^7.3.9",
+    "eslint": "^8.55.0",
+    "eslint-plugin-import": "^2.29.0",
+    "mocha": "~10.2.0",
+    "prettier": "^3.1.1",
+    "rimraf": "^5.0.5",
+    "syncpack": "^11.2.1",
+    "ts-node": "10.9.2",
+    "ts-mocha": "^10.0.0",
+    "typescript": "^5.3.3"
+  },
+  "syncpack": {
+    "dependencyTypes": [
+      "dev",
+      "overrides",
+      "peer",
+      "pnpmOverrides",
+      "prod",
+      "resolutions"
+    ]
+  }
+}

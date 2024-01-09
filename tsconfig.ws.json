@@ -2,7 +2,8 @@
   "references": [
     { "path": "packages/typespec-pydantic/tsconfig.json" },
     { "path": "packages/typespec-flask/tsconfig.json" },
-    { "path": "packages/playground-website/tsconfig.json" }
+    { "path": "packages/playground-website/tsconfig.json" },
+    { "path": "packages/typespec-python-server/tsconfig.json" }
   ],
   "files": []
 }

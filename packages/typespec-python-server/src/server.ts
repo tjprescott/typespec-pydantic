@@ -23,18 +23,18 @@ import {
   code,
 } from "@typespec/compiler/emitter-framework";
 import { getOperationParameters, getRoutePath } from "@typespec/http";
-import { FlaskEmitterOptions } from "./lib.js";
+import { PythonServerEmitterOptions } from "./lib.js";
 import { DeclarationManager } from "./declaration-util.js";
 
-export async function $onEmit(context: EmitContext<FlaskEmitterOptions>) {
-  const assetEmitter = context.getAssetEmitter(FlaskEmitter);
+export async function $onEmit(context: EmitContext<PythonServerEmitterOptions>) {
+  const assetEmitter = context.getAssetEmitter(PythonServerEmitter);
 
   assetEmitter.emitProgram();
 
   await assetEmitter.writeOutput();
 }
 
-class FlaskEmitter extends CodeTypeEmitter {
+class PythonServerEmitter extends CodeTypeEmitter {
   static readonly pythonIndent = "    ";
 
   static readonly builtInPythonTypes = [
@@ -153,7 +153,7 @@ class FlaskEmitter extends CodeTypeEmitter {
   #indent(count: number = 1) {
     let val = "";
     for (let i = 0; i < count; i++) {
-      val += FlaskEmitter.pythonIndent;
+      val += PythonServerEmitter.pythonIndent;
     }
     return val;
   }
@@ -202,7 +202,7 @@ class FlaskEmitter extends CodeTypeEmitter {
 
   /// Transforms names that start with numbers or are reserved keywords.
   #checkName(name: string): string {
-    if (FlaskEmitter.reservedPythonKeywords.includes(name)) {
+    if (PythonServerEmitter.reservedPythonKeywords.includes(name)) {
       return `${name}_`;
     } else if (name.match(/^\d/)) {
       return `_${name}`;
@@ -229,24 +229,9 @@ class FlaskEmitter extends CodeTypeEmitter {
   }
 
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
-    const builder = new StringBuilder();
-
-    this.#addImport("flask", "Flask");
-    for (const [moduleName, names] of sourceFile.imports.entries()) {
-      builder.push(code`from ${moduleName} import ${[...names].join(", ")}\n`);
-    }
-
-    const deferredImports = sourceFile.meta["deferredImports"] as Map<string, Set<string>>;
-    if (deferredImports !== undefined) {
-      builder.push(code`\nif TYPE_CHECKING:\n`);
-      for (const [moduleName, names] of deferredImports.entries()) {
-        builder.push(code`${this.#indent()}from ${moduleName} import ${[...names].join(", ")}\n`);
-      }
-    }
-
     const emittedSourceFile: EmittedSourceFile = {
       path: sourceFile.path,
-      contents: `${builder.reduce()}\napp = Flask(__name__)\n\n`,
+      contents: "",
     };
 
     for (const decl of sourceFile.globalScope.declarations) {
@@ -364,7 +349,7 @@ class FlaskEmitter extends CodeTypeEmitter {
 
   #convertScalarName(scalar: Scalar, name: string | undefined): string {
     const scalarName = name ?? scalar.name;
-    const isBuiltIn = FlaskEmitter.builtInPythonTypes.includes(scalarName);
+    const isBuiltIn = PythonServerEmitter.builtInPythonTypes.includes(scalarName);
     switch (scalarName) {
       case "boolean":
         return "bool";
