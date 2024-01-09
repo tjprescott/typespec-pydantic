@@ -1,15 +1,15 @@
-// namespace Widgets {
-//   namespace Parts {
-//     model Part {
-//       name: string;
-//     }
-//   }
+namespace Widgets {
+  namespace Parts {
+    model Part {
+      name: string;
+    }
+  }
 
-//   model Widget {
-//     name: string;
-//     parts: Parts.Part[];
-//   }
-// }
+  model Widget {
+    name: string;
+    parts: Parts.Part[];
+  }
+}
 
 namespace A {
   model ModelA {

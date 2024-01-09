@@ -33,7 +33,6 @@ import {
 import {
   CodeTypeEmitter,
   Context,
-  Declaration,
   EmitEntity,
   EmittedSourceFile,
   EmitterOutput,
@@ -594,7 +593,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     if (value.kind === "code" && value.value instanceof Placeholder) {
       return code`"${value}"`;
     }
-    return value;
+    return code`${value}`;
   }
 
   #emitDocs(builder: StringBuilder, type: Type) {
@@ -674,7 +673,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     const builder = new StringBuilder();
     const isOptional = property.optional;
     const knownValues = getKnownValues(this.emitter.getProgram(), property);
-    let type: EmitEntity<string> | undefined = undefined;
+    let type: string | StringBuilder | undefined = undefined;
     type = this.#emitTypeReference(property.type);
     // don't emit anything if type is `never`
     if (property.type.kind === "Intrinsic" && property.type.name === "never") return code``;

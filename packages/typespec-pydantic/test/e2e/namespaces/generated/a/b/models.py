@@ -8,9 +8,9 @@ if TYPE_CHECKING:
 class ModelB(BaseModel):
     name: str
 
-    a: Optional[ModelA] = Field(default=None)
+    a: Optional["ModelA"] = Field(default=None)
 
-    c: Optional[ModelC] = Field(default=None)
+    c: Optional["ModelC"] = Field(default=None)
 
 
 

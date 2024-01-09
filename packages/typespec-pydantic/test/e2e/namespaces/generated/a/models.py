@@ -10,7 +10,7 @@ class ModelA(BaseModel):
 
     b: Optional[ModelB] = Field(default=None)
 
-    c: Optional[ModelC] = Field(default=None)
+    c: Optional["ModelC"] = Field(default=None)
 
 
 
