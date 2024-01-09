@@ -212,22 +212,27 @@ class PydanticEmitter extends CodeTypeEmitter {
     return moduleImports.has(name);
   }
 
-  #addImport(module: string, name: string) {
-    const context = this.emitter.getContext();
-    if (context.scope.kind === "sourceFile") {
-      const sourceFile: SourceFile<string> = context.scope.sourceFile;
-
-      // ensure this is not already in deferredImports
-      if (this.#isDeferredImport(sourceFile, module, name)) {
-        return;
+  #addImport(module: string, name: string, sourceFile?: SourceFile<string>) {
+    if (sourceFile === undefined) {
+      const context = this.emitter.getContext();
+      if (context.scope.kind === "sourceFile") {
+        sourceFile = context.scope.sourceFile;
+      } else {
+        throw new Error("Expected source file scope");
       }
-
-      const moduleImports = new Set(sourceFile.imports.get(module) ?? []);
-      moduleImports.add(name);
-      sourceFile.imports.set(module, [...moduleImports]);
-    } else {
-      throw new Error("Expected source file scope");
     }
+    if (sourceFile === undefined) {
+      throw new Error("Unable to determine source file. Please pass it in as an argument.");
+    }
+
+    // ensure this is not already in deferredImports
+    if (this.#isDeferredImport(sourceFile, module, name)) {
+      return;
+    }
+
+    const moduleImports = new Set(sourceFile.imports.get(module) ?? []);
+    moduleImports.add(name);
+    sourceFile.imports.set(module, [...moduleImports]);
   }
 
   #indent(count: number = 1) {
@@ -337,6 +342,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     item: ModelProperty | EnumMember | Scalar,
     emitEquals: boolean = true,
     emitEmptyField: boolean = false,
+    sourceFile?: SourceFile<string>,
   ): StringBuilder {
     const metadata: PydanticFieldMetadata = {};
 
@@ -423,7 +429,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     if (emitEquals) {
       builder.push(code` = `);
     }
-    this.#addImport("pydantic", "Field");
+    this.#addImport("pydantic", "Field", sourceFile);
     builder.push(code`Field(`);
     let i = 0;
     const length = Object.keys(metadata).length;
@@ -488,12 +494,12 @@ class PydanticEmitter extends CodeTypeEmitter {
 
     for (const [name, item] of this.declarations.getDeferred()) {
       if (item.kind === "Model") {
-        this.#addImport("pydantic", "BaseModel");
+        this.#addImport("pydantic", "BaseModel", sourceFile);
         const props = this.emitter.emitModelProperties(item);
         const modelCode = code`class ${name}(BaseModel):\n${props}`;
         emittedSourceFile.contents += modelCode + "\n\n";
       } else if (item.kind === "Scalar") {
-        const scalarCode = this.#emitScalar(item, name);
+        const scalarCode = this.#emitScalar(item, name, sourceFile);
         emittedSourceFile.contents += scalarCode + "\n\n";
       }
     }
@@ -537,15 +543,14 @@ class PydanticEmitter extends CodeTypeEmitter {
 
     const sortedFiles = this.#matchSourceFiles(sourceFiles);
     for (const [modelFile, initFile] of sortedFiles) {
-      if (initFile === undefined) {
-        continue;
-      }
       const modelSf = await this.emitter.emitSourceFile(modelFile);
       if (modelFile.globalScope.declarations.length === 0) {
         continue;
       }
       toEmit.push(modelSf);
-      toEmit.push(await this.#emitInitFile(initFile, modelFile));
+      if (initFile !== undefined) {
+        toEmit.push(await this.#emitInitFile(initFile, modelFile));
+      }
     }
 
     if (!this.emitter.getProgram().compilerOptions.noEmit) {
@@ -853,11 +858,11 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
   }
 
-  #emitScalar(scalar: Scalar, name: string): string | Placeholder<string> {
+  #emitScalar(scalar: Scalar, name: string, sourceFile?: SourceFile<string>): string | Placeholder<string> {
     const knownValues = getKnownValues(this.emitter.getProgram(), scalar);
     const builder = new StringBuilder();
     const baseScalarName = this.#convertScalarName(this.#getBaseScalar(scalar), undefined);
-    this.#addImport("typing", "Annotated");
+    this.#addImport("typing", "Annotated", sourceFile);
     builder.push(code`${this.#checkName(this.#toPascalCase(name))} = Annotated[`);
     if (knownValues !== undefined) {
       builder.push(code`Union[${baseScalarName}, ${knownValues.name}], `);
@@ -865,7 +870,7 @@ class PydanticEmitter extends CodeTypeEmitter {
       builder.push(code`${baseScalarName}, `);
     }
 
-    this.#emitField(builder, scalar, false, true);
+    this.#emitField(builder, scalar, false, true, sourceFile);
     builder.push(code`]`);
     return builder.reduce();
   }
