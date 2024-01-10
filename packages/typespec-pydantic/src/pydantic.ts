@@ -33,6 +33,7 @@ import {
 import {
   CodeTypeEmitter,
   Context,
+  Declaration,
   EmitEntity,
   EmittedSourceFile,
   EmitterOutput,
@@ -579,6 +580,22 @@ class PydanticEmitter extends CodeTypeEmitter {
     return destPath.split("/").slice(0, -1).join(".");
   }
 
+  reference(
+    targetDeclaration: Declaration<string>,
+    pathUp: Scope<string>[],
+    pathDown: Scope<string>[],
+    commonScope: Scope<string> | null,
+  ): string | EmitEntity<string> {
+    if (pathDown.length === 1) {
+      const sourcePath = this.#buildTargetPath(pathUp[0]);
+      const targetPath = this.#buildTargetPath(pathDown[0]);
+      const targetName = targetDeclaration.name;
+      console.log(`ref: ${sourcePath} -> ${targetPath}.${targetName}`);
+      this.#addImport(targetPath, targetName);
+    }
+    return super.reference(targetDeclaration, pathUp, pathDown, commonScope);
+  }
+
   circularReference(
     target: EmitEntity<string>,
     scope: Scope<string> | undefined,
@@ -587,6 +604,8 @@ class PydanticEmitter extends CodeTypeEmitter {
     if (scope?.kind === "sourceFile" && target.kind === "declaration") {
       const targetName = target.name;
       const targetPath = this.#buildTargetPath(target.scope);
+      const sourcePath = this.#buildTargetPath(scope);
+      console.log(`circular ref: ${sourcePath} -> ${targetPath}.${targetName}`);
       this.#addImport("typing", "TYPE_CHECKING");
       this.#addDeferredImport(targetPath, targetName);
     }
@@ -595,7 +614,7 @@ class PydanticEmitter extends CodeTypeEmitter {
 
   #emitTypeReference(type: Type) {
     const value = this.emitter.emitTypeReference(type);
-    if (value.kind === "code" && value.value instanceof Placeholder) {
+    if (value.kind === "code" && value.value instanceof Placeholder && (value.value as any).segments === undefined) {
       return code`"${value}"`;
     }
     return code`${value}`;
@@ -657,17 +676,6 @@ class PydanticEmitter extends CodeTypeEmitter {
   modelProperties(model: Model): EmitterOutput<string> {
     const builder = new StringBuilder();
     for (const prop of model.properties.values()) {
-      if (prop.type.kind === "Model") {
-        const modelNs = model.namespace ? getNamespaceFullName(model.namespace) : undefined;
-        const propNs = prop.type.namespace ? getNamespaceFullName(prop.type.namespace) : undefined;
-        if (modelNs !== undefined && propNs !== undefined && modelNs !== propNs) {
-          const propPath = propNs
-            .split(".")
-            .map((seg) => this.#toSnakeCase(seg))
-            .join(".");
-          this.#addImport(propPath, prop.type.name);
-        }
-      }
       const propResult = this.emitter.emitModelProperty(prop);
       builder.push(code`${this.#indent()}${propResult}\n`);
     }
@@ -679,6 +687,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     const isOptional = property.optional;
     const knownValues = getKnownValues(this.emitter.getProgram(), property);
     let type: string | StringBuilder | undefined = undefined;
+    console.log(`EmitTypeReference: ${property.model!.name}.${property.name}`);
     type = this.#emitTypeReference(property.type);
     // don't emit anything if type is `never`
     if (property.type.kind === "Intrinsic" && property.type.name === "never") return code``;

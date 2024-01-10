@@ -87,6 +87,36 @@ function trimLines(lines: string[]): string[] {
   return trimmed;
 }
 
+export function checkImports(expected: Map<string, string[]>, lines: string[]) {
+  const imports = new Map<string, string[]>();
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("from")) {
+      const match = trimmed.match(/^from\s+(\w+)\s+import\s+(.*)$/);
+      if (match !== null) {
+        imports.set(match[1], match[2].split(","));
+      }
+    } else if (trimmed.startsWith("import")) {
+      const match = trimmed.match(/^import\s+(.*)$/);
+      if (match !== null) {
+        imports.set(match[1], []);
+      }
+    } else if (line === "") {
+      continue;
+    } else {
+      break;
+    }
+  }
+  strictEqual(expected.size, imports.size);
+  for (const [key, value] of expected.entries()) {
+    const actual = imports.get(key);
+    strictEqual(value.length, actual?.length);
+    for (const item of value) {
+      strictEqual(true, actual?.includes(item));
+    }
+  }
+}
+
 /** Compares an expected string to a subset of the actual output. */
 export function compare(expect: string, lines: string[], ignoreImports: boolean = true) {
   // split the input into lines and ignore leading or trailing empty lines.
