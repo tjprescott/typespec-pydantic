@@ -165,6 +165,9 @@ importers:
       typespec-pydantic:
         specifier: workspace:~1.0.0-beta.1
         version: link:../typespec-pydantic
+      typespec-python-server:
+        specifier: workspace:~1.0.0-beta.1
+        version: link:../typespec-python-server
     devDependencies:
       '@types/mocha':
         specifier: ~10.0.1
@@ -318,6 +321,12 @@ importers:
       '@typespec/rest':
         specifier: ^0.50.0
         version: 0.50.0(@typespec/compiler@0.50.0)(@typespec/http@0.50.0)
+      typespec-flask:
+        specifier: workspace:~1.0.0-beta.1
+        version: link:../typespec-flask
+      typespec-pydantic:
+        specifier: workspace:~1.0.0-beta.1
+        version: link:../typespec-pydantic
     devDependencies:
       '@changesets/cli':
         specifier: ^2.27.1
@@ -3105,6 +3114,7 @@ packages:
 
   /@swagger-api/apidom-ns-json-schema-draft-4@0.89.0:
     resolution: {integrity: sha512-7gXy3BPLkS7p7dmz9Hbf7ia4lH0NAaW2i7GcQdpX48pAUTR0/7Y+BPd38sgRxIOpebReWxnoAcKAfkak/KCQ3A==}
+    requiresBuild: true
     dependencies:
       '@babel/runtime-corejs3': 7.23.7
       '@swagger-api/apidom-ast': 0.89.0

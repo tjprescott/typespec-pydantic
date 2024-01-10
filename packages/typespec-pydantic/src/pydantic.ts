@@ -119,7 +119,7 @@ interface PydanticFieldMetadata {
   exclude?: boolean;
 }
 
-class PydanticEmitter extends CodeTypeEmitter {
+export class PydanticEmitter extends CodeTypeEmitter {
   static readonly pythonIndent = "    ";
 
   static readonly builtInPythonTypes = [

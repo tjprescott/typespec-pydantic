@@ -1,27 +1,54 @@
-import { JSONSchemaType, createTypeSpecLibrary } from "@typespec/compiler";
+import { JSONSchemaType, createTypeSpecLibrary, paramMessage } from "@typespec/compiler";
 
 export interface PythonServerEmitterOptions {
-  "output-file"?: string;
+  "model-emitter"?: string;
+  "operation-emitter"?: string;
 }
 
 const PythonServerEmitterOptionsSchema: JSONSchemaType<PythonServerEmitterOptions> = {
   type: "object",
   additionalProperties: false,
   properties: {
-    "output-file": { type: "string", nullable: true },
+    "model-emitter": { type: "string", nullable: true },
+    "operation-emitter": { type: "string", nullable: true },
   },
   required: [],
 };
 
-const libName = "typespec-flask";
+const libName = "typespec-python-server";
 
 export const $lib = createTypeSpecLibrary({
   name: libName,
   diagnostics: {
-    "unexpected-error": {
+    "file-not-found": {
       severity: "error",
       messages: {
-        default: "An unexpected error occurred. Please file an issue.",
+        default: paramMessage`File ${"path"} not found.`,
+      },
+    },
+    "file-load": {
+      severity: "error",
+      messages: {
+        default: paramMessage`${"message"}`,
+      },
+    },
+    "invalid-emitter": {
+      severity: "error",
+      messages: {
+        default: paramMessage`Requested emitter package ${"emitterPackage"} does not provide an "onEmit" function.`,
+      },
+    },
+    "import-not-found": {
+      severity: "error",
+      messages: {
+        default: paramMessage`Couldn't resolve import "${"path"}"`,
+      },
+    },
+    "library-invalid": {
+      severity: "error",
+      messages: {
+        tspMain: paramMessage`Library "${"path"}" has an invalid tspMain file.`,
+        default: paramMessage`Library "${"path"}" has an invalid main file.`,
       },
     },
   },

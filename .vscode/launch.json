@@ -19,6 +19,14 @@
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}/packages/typespec-pydantic/node_modules/@typespec/compiler/entrypoints/cli.js",
       "args": ["compile", "${workspaceFolder}/packages/typespec-pydantic/test/e2e/namespaces/main.tsp"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Python-Server",
+      "skipFiles": ["<node_internals>/**"],
+      "program": "${workspaceFolder}/packages/typespec-pydantic/node_modules/@typespec/compiler/entrypoints/cli.js",
+      "args": ["compile", "${workspaceFolder}/packages/samples/scratch/main.tsp"]
     }
   ]
 }

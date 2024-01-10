@@ -34,7 +34,7 @@ export async function $onEmit(context: EmitContext<FlaskEmitterOptions>) {
   await assetEmitter.writeOutput();
 }
 
-class FlaskEmitter extends CodeTypeEmitter {
+export class FlaskEmitter extends CodeTypeEmitter {
   static readonly pythonIndent = "    ";
 
   static readonly builtInPythonTypes = [
