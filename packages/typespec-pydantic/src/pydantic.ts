@@ -177,6 +177,8 @@ class PydanticEmitter extends CodeTypeEmitter {
 
   private declarations = new DeclarationManager();
 
+  private currNamespace: string[] = [];
+
   #addDeferredImport(module: string, name: string) {
     const context = this.emitter.getContext();
     if (context.scope.kind === "sourceFile") {
@@ -563,16 +565,24 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
   }
 
-  #buildTargetPath(dest: Scope<string>): string {
+  #buildNamespaceFromModel(model: Model): string | undefined {
+    if (model.namespace === undefined) return undefined;
+    const fullNsName = getNamespaceFullName(model.namespace);
+    return fullNsName
+      .split(".")
+      .map((seg) => this.#toSnakeCase(seg))
+      .join(".");
+  }
+
+  #buildNamespaceFromScope(dest: Scope<string>): string {
     if (dest.kind !== "sourceFile") {
-      throw new Error("Expected source and dest to be source files");
+      throw new Error("Expected a source file");
     }
     const outputDir = this.emitter.getOptions().emitterOutputDir;
     let destPath = dest.sourceFile.path;
-    if (!destPath.startsWith(outputDir)) {
-      throw new Error("Expected source and dest to be in the output directory");
+    if (destPath.startsWith(outputDir)) {
+      destPath = destPath.substring(outputDir.length);
     }
-    destPath = destPath.substring(outputDir.length);
     if (destPath.startsWith("/")) {
       destPath = destPath.substring(1);
     }
@@ -586,16 +596,24 @@ class PydanticEmitter extends CodeTypeEmitter {
   ): string | EmitEntity<string> {
     if (scope?.kind === "sourceFile" && target.kind === "declaration") {
       const targetName = target.name;
-      const targetPath = this.#buildTargetPath(target.scope);
-      this.#addImport("typing", "TYPE_CHECKING");
-      this.#addDeferredImport(targetPath, targetName);
+      const targetPath = this.#buildNamespaceFromScope(target.scope);
+      const sourcePath = this.#buildNamespaceFromScope(scope);
+      if (targetPath !== sourcePath) {
+        this.#addImport("typing", "TYPE_CHECKING");
+        this.#addDeferredImport(targetPath, targetName);
+      }
     }
     return super.circularReference(target, scope, cycle);
   }
 
   #emitTypeReference(type: Type) {
+    const sourceNs = this.currNamespace.slice(-1)[0];
+    const destNs = this.#buildNamespaceFromModel(type as Model);
+    if (sourceNs !== destNs && destNs !== undefined && destNs !== "type_spec") {
+      this.#addImport(destNs, (type as Model).name);
+    }
     const value = this.emitter.emitTypeReference(type);
-    if (value.kind === "code" && value.value instanceof Placeholder) {
+    if (value.kind === "code" && value.value instanceof Placeholder && (value.value as any).segments === undefined) {
       return code`"${value}"`;
     }
     return code`${value}`;
@@ -616,6 +634,10 @@ class PydanticEmitter extends CodeTypeEmitter {
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
+    const namespace = this.#buildNamespaceFromModel(model);
+    if (namespace !== undefined) {
+      this.currNamespace.push(namespace);
+    }
     const builder = new StringBuilder();
     const baseModel = model.baseModel?.name ?? "BaseModel";
     if (baseModel === "BaseModel") {
@@ -630,6 +652,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     } else {
       builder.push(code`${this.#indent()}pass`);
     }
+    this.currNamespace.pop();
     return this.#declare(name, builder.reduce());
   }
 
@@ -657,17 +680,6 @@ class PydanticEmitter extends CodeTypeEmitter {
   modelProperties(model: Model): EmitterOutput<string> {
     const builder = new StringBuilder();
     for (const prop of model.properties.values()) {
-      if (prop.type.kind === "Model") {
-        const modelNs = model.namespace ? getNamespaceFullName(model.namespace) : undefined;
-        const propNs = prop.type.namespace ? getNamespaceFullName(prop.type.namespace) : undefined;
-        if (modelNs !== undefined && propNs !== undefined && modelNs !== propNs) {
-          const propPath = propNs
-            .split(".")
-            .map((seg) => this.#toSnakeCase(seg))
-            .join(".");
-          this.#addImport(propPath, prop.type.name);
-        }
-      }
       const propResult = this.emitter.emitModelProperty(prop);
       builder.push(code`${this.#indent()}${propResult}\n`);
     }

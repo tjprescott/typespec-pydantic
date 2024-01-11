@@ -1,5 +1,5 @@
 import { expectDiagnosticEmpty } from "@typespec/compiler/testing";
-import { compare, pydanticOutputFor } from "./test-host.js";
+import { checkImports, compare, pydanticOutputFor } from "./test-host.js";
 import { strictEqual } from "assert";
 
 describe("typespec-pydantic: core", () => {
@@ -10,21 +10,21 @@ describe("typespec-pydantic: core", () => {
         model ModelA {
           name: string;
           b?: B.ModelB;
-          c?: B.C.ModelC;
+          c?: B.C.ModelC[];
         }
 
         namespace B {
           model ModelB {
             name: string;
             a?: ModelA;
-            c?: C.ModelC;
+            c?: C.ModelC[];
           }
 
           namespace C {
             model ModelC {
               name: string;
               a?: ModelA;
-              b?: ModelB;
+              b?: ModelB[];
             }
           }
         }
@@ -38,7 +38,7 @@ describe("typespec-pydantic: core", () => {
       const aModelExpect = `
       from pydantic import BaseModel, Field
       from a.b import ModelB
-      from typing import Optional, TYPE_CHECKING
+      from typing import Optional, List, TYPE_CHECKING
 
       if TYPE_CHECKING:
           from a.b.c import ModelC
@@ -48,7 +48,7 @@ describe("typespec-pydantic: core", () => {
 
           b: Optional[ModelB] = Field(default=None)
 
-          c: Optional["ModelC"] = Field(default=None)
+          c: Optional[List["ModelC"]] = Field(default=None)
       `;
       const bInitExpect = `
       from .models import ModelB
@@ -57,7 +57,7 @@ describe("typespec-pydantic: core", () => {
       `;
       const bModelExpect = `
       from pydantic import BaseModel, Field
-      from typing import Optional, TYPE_CHECKING
+      from typing import Optional, List, TYPE_CHECKING
 
       if TYPE_CHECKING:
           from a import ModelA
@@ -68,7 +68,7 @@ describe("typespec-pydantic: core", () => {
 
           a: Optional["ModelA"] = Field(default=None)
 
-          c: Optional["ModelC"] = Field(default=None)
+          c: Optional[List["ModelC"]] = Field(default=None)
       `;
       const cInitExpect = `
       from .models import ModelC
@@ -78,15 +78,15 @@ describe("typespec-pydantic: core", () => {
       const cModelExpect = `
       from pydantic import BaseModel, Field
       from a import ModelA
+      from typing import List, Optional
       from a.b import ModelB
-      from typing import Optional
 
       class ModelC(BaseModel):
           name: str
 
           a: Optional[ModelA] = Field(default=None)
 
-          b: Optional[ModelB] = Field(default=None)
+          b: Optional[List[ModelB]] = Field(default=None)
       `;
       const [results, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -361,6 +361,13 @@ describe("typespec-pydantic: core", () => {
         `;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
+      checkImports(
+        new Map([
+          ["pydantic", ["BaseModel"]],
+          ["typing", ["List"]],
+        ]),
+        result[0].contents,
+      );
       compare(expect, result[0].contents);
     });
 
@@ -436,6 +443,26 @@ describe("typespec-pydantic: core", () => {
         class Widget(BaseModel):
             part: WidgetPart
             parts: List[WidgetPart]`;
+      const [result, diagnostics] = await pydanticOutputFor(input);
+      expectDiagnosticEmpty(diagnostics);
+      compare(expect, result[0].contents);
+    });
+
+    it("supports circular class reference properties", async () => {
+      const input = `
+        model ModelA {
+          b: ModelB;
+        }
+        
+        model ModelB {
+            a: ModelA;
+        }`;
+      const expect = `
+        class ModelB(BaseModel):
+            a: "ModelA"
+
+        class ModelA(BaseModel):
+            b: ModelB`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result[0].contents);
