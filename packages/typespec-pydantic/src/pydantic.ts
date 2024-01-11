@@ -564,16 +564,24 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
   }
 
+  #buildNamespace(ns: Namespace | undefined): string | undefined {
+    if (ns === undefined) return undefined;
+    const fullNsName = getNamespaceFullName(ns);
+    return fullNsName
+      .split(".")
+      .map((seg) => this.#toSnakeCase(seg))
+      .join(".");
+  }
+
   #buildTargetPath(dest: Scope<string>): string {
     if (dest.kind !== "sourceFile") {
-      throw new Error("Expected source and dest to be source files");
+      throw new Error("Expected a source file");
     }
     const outputDir = this.emitter.getOptions().emitterOutputDir;
     let destPath = dest.sourceFile.path;
-    if (!destPath.startsWith(outputDir)) {
-      throw new Error("Expected source and dest to be in the output directory");
+    if (destPath.startsWith(outputDir)) {
+      destPath = destPath.substring(outputDir.length);
     }
-    destPath = destPath.substring(outputDir.length);
     if (destPath.startsWith("/")) {
       destPath = destPath.substring(1);
     }
@@ -587,10 +595,10 @@ class PydanticEmitter extends CodeTypeEmitter {
     commonScope: Scope<string> | null,
   ): string | EmitEntity<string> {
     if (pathDown.length === 1) {
-      const sourcePath = this.#buildTargetPath(pathUp[0]);
       const targetPath = this.#buildTargetPath(pathDown[0]);
       const targetName = targetDeclaration.name;
-      console.log(`ref: ${sourcePath} -> ${targetPath}.${targetName}`);
+      const sourcePath = this.#buildTargetPath(pathUp[0]);
+      console.log(`Reference: ${sourcePath} -> ${targetPath}.${targetName}`);
       this.#addImport(targetPath, targetName);
     }
     return super.reference(targetDeclaration, pathUp, pathDown, commonScope);
@@ -605,9 +613,11 @@ class PydanticEmitter extends CodeTypeEmitter {
       const targetName = target.name;
       const targetPath = this.#buildTargetPath(target.scope);
       const sourcePath = this.#buildTargetPath(scope);
-      console.log(`circular ref: ${sourcePath} -> ${targetPath}.${targetName}`);
-      this.#addImport("typing", "TYPE_CHECKING");
-      this.#addDeferredImport(targetPath, targetName);
+      console.log(`Circular: ${sourcePath} -> ${targetPath}.${targetName}`);
+      if (targetPath !== sourcePath) {
+        this.#addImport("typing", "TYPE_CHECKING");
+        this.#addDeferredImport(targetPath, targetName);
+      }
     }
     return super.circularReference(target, scope, cycle);
   }
@@ -687,7 +697,6 @@ class PydanticEmitter extends CodeTypeEmitter {
     const isOptional = property.optional;
     const knownValues = getKnownValues(this.emitter.getProgram(), property);
     let type: string | StringBuilder | undefined = undefined;
-    console.log(`EmitTypeReference: ${property.model!.name}.${property.name}`);
     type = this.#emitTypeReference(property.type);
     // don't emit anything if type is `never`
     if (property.type.kind === "Intrinsic" && property.type.name === "never") return code``;

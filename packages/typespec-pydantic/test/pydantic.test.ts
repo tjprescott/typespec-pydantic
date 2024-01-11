@@ -448,6 +448,26 @@ describe("typespec-pydantic: core", () => {
       compare(expect, result[0].contents);
     });
 
+    it("supports circular class reference properties", async () => {
+      const input = `
+        model ModelA {
+          b: ModelB;
+        }
+        
+        model ModelB {
+            a: ModelA;
+        }`;
+      const expect = `
+        class ModelB(BaseModel):
+            a: "ModelA"
+
+        class ModelA(BaseModel):
+            b: ModelB`;
+      const [result, diagnostics] = await pydanticOutputFor(input);
+      expectDiagnosticEmpty(diagnostics);
+      compare(expect, result[0].contents);
+    });
+
     it("supports dict properties", async () => {
       const input = `
         model Widget {
