@@ -33,7 +33,6 @@ import {
 import {
   CodeTypeEmitter,
   Context,
-  Declaration,
   EmitEntity,
   EmittedSourceFile,
   EmitterOutput,
@@ -177,6 +176,8 @@ class PydanticEmitter extends CodeTypeEmitter {
   ];
 
   private declarations = new DeclarationManager();
+
+  private currNamespace: string[] = [];
 
   #addDeferredImport(module: string, name: string) {
     const context = this.emitter.getContext();
@@ -564,16 +565,16 @@ class PydanticEmitter extends CodeTypeEmitter {
     }
   }
 
-  #buildNamespace(ns: Namespace | undefined): string | undefined {
-    if (ns === undefined) return undefined;
-    const fullNsName = getNamespaceFullName(ns);
+  #buildNamespaceFromModel(model: Model): string | undefined {
+    if (model.namespace === undefined) return undefined;
+    const fullNsName = getNamespaceFullName(model.namespace);
     return fullNsName
       .split(".")
       .map((seg) => this.#toSnakeCase(seg))
       .join(".");
   }
 
-  #buildTargetPath(dest: Scope<string>): string {
+  #buildNamespaceFromScope(dest: Scope<string>): string {
     if (dest.kind !== "sourceFile") {
       throw new Error("Expected a source file");
     }
@@ -588,22 +589,6 @@ class PydanticEmitter extends CodeTypeEmitter {
     return destPath.split("/").slice(0, -1).join(".");
   }
 
-  reference(
-    targetDeclaration: Declaration<string>,
-    pathUp: Scope<string>[],
-    pathDown: Scope<string>[],
-    commonScope: Scope<string> | null,
-  ): string | EmitEntity<string> {
-    if (pathDown.length === 1) {
-      const targetPath = this.#buildTargetPath(pathDown[0]);
-      const targetName = targetDeclaration.name;
-      const sourcePath = this.#buildTargetPath(pathUp[0]);
-      console.log(`Reference: ${sourcePath} -> ${targetPath}.${targetName}`);
-      this.#addImport(targetPath, targetName);
-    }
-    return super.reference(targetDeclaration, pathUp, pathDown, commonScope);
-  }
-
   circularReference(
     target: EmitEntity<string>,
     scope: Scope<string> | undefined,
@@ -611,9 +596,8 @@ class PydanticEmitter extends CodeTypeEmitter {
   ): string | EmitEntity<string> {
     if (scope?.kind === "sourceFile" && target.kind === "declaration") {
       const targetName = target.name;
-      const targetPath = this.#buildTargetPath(target.scope);
-      const sourcePath = this.#buildTargetPath(scope);
-      console.log(`Circular: ${sourcePath} -> ${targetPath}.${targetName}`);
+      const targetPath = this.#buildNamespaceFromScope(target.scope);
+      const sourcePath = this.#buildNamespaceFromScope(scope);
       if (targetPath !== sourcePath) {
         this.#addImport("typing", "TYPE_CHECKING");
         this.#addDeferredImport(targetPath, targetName);
@@ -623,6 +607,11 @@ class PydanticEmitter extends CodeTypeEmitter {
   }
 
   #emitTypeReference(type: Type) {
+    const sourceNs = this.currNamespace.slice(-1)[0];
+    const destNs = this.#buildNamespaceFromModel(type as Model);
+    if (sourceNs !== destNs && destNs !== undefined && destNs !== "type_spec") {
+      this.#addImport(destNs, (type as Model).name);
+    }
     const value = this.emitter.emitTypeReference(type);
     if (value.kind === "code" && value.value instanceof Placeholder && (value.value as any).segments === undefined) {
       return code`"${value}"`;
@@ -645,6 +634,10 @@ class PydanticEmitter extends CodeTypeEmitter {
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
+    const namespace = this.#buildNamespaceFromModel(model);
+    if (namespace !== undefined) {
+      this.currNamespace.push(namespace);
+    }
     const builder = new StringBuilder();
     const baseModel = model.baseModel?.name ?? "BaseModel";
     if (baseModel === "BaseModel") {
@@ -659,6 +652,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     } else {
       builder.push(code`${this.#indent()}pass`);
     }
+    this.currNamespace.pop();
     return this.#declare(name, builder.reduce());
   }
 
