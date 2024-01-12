@@ -4,7 +4,7 @@ import { strictEqual } from "assert";
 
 describe("typespec-pydantic: core", () => {
   describe("namespaces", () => {
-    it("namespaces as packages", async () => {
+    it("namespaces as packages: all circular", async () => {
       const input = `
       namespace A {
         model ModelA {
@@ -87,6 +87,76 @@ describe("typespec-pydantic: core", () => {
           a: Optional[ModelA] = Field(default=None)
 
           b: Optional[List[ModelB]] = Field(default=None)
+      `;
+      const [results, diagnostics] = await pydanticOutputFor(input);
+      expectDiagnosticEmpty(diagnostics);
+      strictEqual(results.length, 6);
+      compare(aModelExpect, results[0].contents, false);
+      compare(aInitExpect, results[1].contents, false);
+      compare(bModelExpect, results[2].contents, false);
+      compare(bInitExpect, results[3].contents, false);
+      compare(cModelExpect, results[4].contents, false);
+      compare(cInitExpect, results[5].contents, false);
+    });
+
+    it("namespaces as packages: loop", async () => {
+      const input = `
+      namespace A {
+        model ModelA {
+          b: B.ModelB;
+        }
+
+        namespace B {
+          model ModelB {
+            c: C.ModelC;
+          }
+
+          namespace C {
+            model ModelC {
+              a: ModelA;
+            }
+          }
+        }
+      }
+      `;
+      const aInitExpect = `
+      from .models import ModelA
+
+      __all__ = ["ModelA"]
+      `;
+      const aModelExpect = `
+      from pydantic import BaseModel
+      from a.b import ModelB
+
+      class ModelA(BaseModel):
+          b: ModelB
+      `;
+      const bInitExpect = `
+      from .models import ModelB
+
+      __all__ = ["ModelB"]
+      `;
+      const bModelExpect = `
+      from pydantic import BaseModel
+      from typing import TYPE_CHECKING
+
+      if TYPE_CHECKING:
+          from a.b.c import ModelC
+
+      class ModelB(BaseModel):
+          c: "ModelC"
+      `;
+      const cInitExpect = `
+      from .models import ModelC
+
+      __all__ = ["ModelC"]
+      `;
+      const cModelExpect = `
+      from pydantic import BaseModel
+      from a import ModelA
+
+      class ModelC(BaseModel):
+          a: ModelA
       `;
       const [results, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
