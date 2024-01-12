@@ -620,7 +620,7 @@ class PydanticEmitter extends CodeTypeEmitter {
     return target.entity.scope.sourceFile as SourceFile<string>;
   }
 
-  #getSourceModel(cycle: ReferenceCycle): Model | undefined {
+  #getNextModel(cycle: ReferenceCycle): Model | undefined {
     const target = [...cycle].slice(1, 2)[0];
     if (target.type.kind !== "ModelProperty") {
       throw new Error("Expected next referenced type to be a model property");
@@ -648,12 +648,9 @@ class PydanticEmitter extends CodeTypeEmitter {
 
       // workaround for circular references
       const reciprocalSourceFile = this.#getReciprocalSourceFile(cycle);
-      const sourceModel = this.#getSourceModel(cycle)!;
-      const sourceNamespace = this.#buildNamespaceFromModel(sourceModel);
-      if (sourcePath !== sourceNamespace) {
-        throw new Error("Expected source path to match source namespace");
-      }
-      this.#addImport(sourcePath, sourceModel.name, reciprocalSourceFile);
+      const nextModel = this.#getNextModel(cycle)!;
+      const nextNamespace = this.#buildNamespaceFromModel(nextModel)!;
+      this.#addImport(nextNamespace, nextModel.name, reciprocalSourceFile);
     }
     return super.circularReference(target, scope, cycle);
   }

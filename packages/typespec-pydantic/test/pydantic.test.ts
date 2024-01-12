@@ -77,9 +77,9 @@ describe("typespec-pydantic: core", () => {
       `;
       const cModelExpect = `
       from pydantic import BaseModel, Field
-      from a import ModelA
       from typing import List, Optional
       from a.b import ModelB
+      from a import ModelA
 
       class ModelC(BaseModel):
           name: str
