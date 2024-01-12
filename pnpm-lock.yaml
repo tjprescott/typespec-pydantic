@@ -309,6 +309,9 @@ importers:
       typescript:
         specifier: ^5.3.3
         version: 5.3.3
+      typespec-python-server:
+        specifier: workspace:~1.0.0-beta.1
+        version: link:../typespec-python-server
 
   packages/typespec-python-server:
     dependencies:
