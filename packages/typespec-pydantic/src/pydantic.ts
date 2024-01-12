@@ -33,6 +33,7 @@ import {
 import {
   CodeTypeEmitter,
   Context,
+  Declaration,
   EmitEntity,
   EmittedSourceFile,
   EmitterOutput,
@@ -176,8 +177,6 @@ class PydanticEmitter extends CodeTypeEmitter {
   ];
 
   private declarations = new DeclarationManager();
-
-  private currNamespace: string[] = [];
 
   #addDeferredImport(module: string, name: string) {
     const context = this.emitter.getContext();
@@ -589,6 +588,50 @@ class PydanticEmitter extends CodeTypeEmitter {
     return destPath.split("/").slice(0, -1).join(".");
   }
 
+  reference(
+    targetDeclaration: Declaration<string>,
+    pathUp: Scope<string>[],
+    pathDown: Scope<string>[],
+    commonScope: Scope<string> | null,
+  ): string | EmitEntity<string> {
+    const destScope = pathDown[0];
+    if (pathDown.length > 1) {
+      throw new Error("Expected pathDown to be length 1 or 0");
+    }
+    if (destScope?.kind === "sourceFile") {
+      const targetName = targetDeclaration.name;
+      const targetPath = this.#buildNamespaceFromScope(destScope);
+      this.#addImport(targetPath, targetName);
+    }
+    return super.reference(targetDeclaration, pathUp, pathDown, commonScope);
+  }
+
+  #getReciprocalSourceFile(cycle: ReferenceCycle): SourceFile<string> | undefined {
+    const target = cycle.first;
+    if (target.entity.kind !== "declaration") {
+      throw new Error("Expected next referenced entity to be a declaration");
+    }
+    if (target.entity.scope.kind !== "sourceFile") {
+      throw new Error("Expected next referenced entity to be a source file");
+    }
+    if (target.type.kind !== "Model") {
+      throw new Error("Expected next referenced type to be a model");
+    }
+    return target.entity.scope.sourceFile as SourceFile<string>;
+  }
+
+  #getSourceModel(cycle: ReferenceCycle): Model | undefined {
+    const target = [...cycle].slice(1, 2)[0];
+    if (target.type.kind !== "ModelProperty") {
+      throw new Error("Expected next referenced type to be a model property");
+    }
+    const targetType = target.type.type;
+    if (targetType.kind !== "Model") {
+      throw new Error("Expected next referenced type to be a model");
+    }
+    return targetType;
+  }
+
   circularReference(
     target: EmitEntity<string>,
     scope: Scope<string> | undefined,
@@ -602,16 +645,20 @@ class PydanticEmitter extends CodeTypeEmitter {
         this.#addImport("typing", "TYPE_CHECKING");
         this.#addDeferredImport(targetPath, targetName);
       }
+
+      // workaround for circular references
+      const reciprocalSourceFile = this.#getReciprocalSourceFile(cycle);
+      const sourceModel = this.#getSourceModel(cycle)!;
+      const sourceNamespace = this.#buildNamespaceFromModel(sourceModel);
+      if (sourcePath !== sourceNamespace) {
+        throw new Error("Expected source path to match source namespace");
+      }
+      this.#addImport(sourcePath, sourceModel.name, reciprocalSourceFile);
     }
     return super.circularReference(target, scope, cycle);
   }
 
   #emitTypeReference(type: Type) {
-    const sourceNs = this.currNamespace.slice(-1)[0];
-    const destNs = this.#buildNamespaceFromModel(type as Model);
-    if (sourceNs !== destNs && destNs !== undefined && destNs !== "type_spec") {
-      this.#addImport(destNs, (type as Model).name);
-    }
     const value = this.emitter.emitTypeReference(type);
     if (value.kind === "code" && value.value instanceof Placeholder && (value.value as any).segments === undefined) {
       return code`"${value}"`;
@@ -634,10 +681,6 @@ class PydanticEmitter extends CodeTypeEmitter {
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
-    const namespace = this.#buildNamespaceFromModel(model);
-    if (namespace !== undefined) {
-      this.currNamespace.push(namespace);
-    }
     const builder = new StringBuilder();
     const baseModel = model.baseModel?.name ?? "BaseModel";
     if (baseModel === "BaseModel") {
@@ -652,7 +695,6 @@ class PydanticEmitter extends CodeTypeEmitter {
     } else {
       builder.push(code`${this.#indent()}pass`);
     }
-    this.currNamespace.pop();
     return this.#declare(name, builder.reduce());
   }
 
