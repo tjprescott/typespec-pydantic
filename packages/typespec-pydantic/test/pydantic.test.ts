@@ -168,6 +168,56 @@ describe("typespec-pydantic: core", () => {
       compare(cModelExpect, results[4].contents, false);
       compare(cInitExpect, results[5].contents, false);
     });
+
+    it("namespaces as packages: lollipop", async () => {
+      const input = `
+      namespace A {
+        model ModelA {
+          b: B.ModelB;
+        }
+        namespace B {
+          model ModelB {
+            c: C.ModelC;
+          }
+          namespace C {
+            model ModelC {
+              b: ModelB;
+            }
+          }
+        }
+      }
+      `;
+      const aModelExpect = `
+      from pydantic import BaseModel
+      from a.b import ModelB
+
+      class ModelA(BaseModel):
+          b: ModelB
+      `;
+      const bModelExpect = `
+      from pydantic import BaseModel
+      from typing import TYPE_CHECKING
+
+      if TYPE_CHECKING:
+          from a.b.c import ModelC
+
+      class ModelB(BaseModel):
+          c: "ModelC"
+      `;
+      const cModelExpect = `
+      from pydantic import BaseModel
+      from a.b import ModelB
+
+      class ModelC(BaseModel):
+          b: ModelB
+      `;
+      const [results, diagnostics] = await pydanticOutputFor(input);
+      expectDiagnosticEmpty(diagnostics);
+      strictEqual(results.length, 6);
+      compare(aModelExpect, results[0].contents, false);
+      compare(bModelExpect, results[2].contents, false);
+      compare(cModelExpect, results[4].contents, false);
+    });
   });
 
   describe("models", () => {
