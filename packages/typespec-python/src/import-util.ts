@@ -19,6 +19,11 @@ export class ImportManager {
     this.emitter = emitter;
   }
 
+  getImports(sourceFile: SourceFile<string>, kind: ImportKind): Map<string, Set<string>> {
+    const fileImports = kind === ImportKind.deferred ? this.deferredImports : this.imports;
+    return fileImports.get(sourceFile) ?? new Map<string, Set<string>>();
+  }
+
   has(sourceFile: SourceFile<string>, module: string, name: string, kind: ImportKind): boolean {
     const fileImports =
       kind === ImportKind.deferred ? this.deferredImports.get(sourceFile) : this.imports.get(sourceFile);
@@ -67,5 +72,6 @@ export class ImportManager {
     const moduleImports = fileImports.get(module);
     if (moduleImports === undefined) return;
     moduleImports.delete(name);
+    moduleImports.size === 0 && fileImports.delete(module);
   }
 }

@@ -1,4 +1,4 @@
-import { PythonPartialEmitter } from "typespec-python";
+import { PythonPartialEmitter, ImportKind } from "typespec-python";
 import {
   BooleanLiteral,
   EmitContext,
@@ -44,7 +44,6 @@ import {
 } from "@typespec/compiler/emitter-framework";
 import { PydanticEmitterOptions, reportDiagnostic } from "./lib.js";
 import { getFields } from "./decorators.js";
-import { ImportKind } from "../../typespec-python/dist/src/import-util.js";
 
 export async function $onEmit(context: EmitContext<PydanticEmitterOptions>) {
   const assetEmitter = context.getAssetEmitter(PydanticEmitter);
@@ -274,14 +273,14 @@ export class PydanticEmitter extends PythonPartialEmitter {
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
     const builder = new StringBuilder();
 
-    for (const [moduleName, names] of sourceFile.imports.entries()) {
+    for (const [moduleName, names] of this.imports.getImports(sourceFile, ImportKind.regular)) {
       builder.push(code`from ${moduleName} import ${[...names].join(", ")}\n`);
     }
 
-    const deferredImports = sourceFile.meta["deferredImports"] as Map<string, Set<string>>;
-    if (deferredImports !== undefined) {
+    const deferredImports = this.imports.getImports(sourceFile, ImportKind.deferred);
+    if (deferredImports.size > 0) {
       builder.push(code`\nif TYPE_CHECKING:\n`);
-      for (const [moduleName, names] of deferredImports.entries()) {
+      for (const [moduleName, names] of deferredImports) {
         builder.push(code`${this.indent()}from ${moduleName} import ${[...names].join(", ")}\n`);
       }
     }

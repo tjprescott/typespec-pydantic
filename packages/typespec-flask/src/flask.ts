@@ -1,4 +1,4 @@
-import { PythonPartialEmitter } from "typespec-python";
+import { ImportKind, PythonPartialEmitter } from "typespec-python";
 import {
   BooleanLiteral,
   EmitContext,
@@ -44,14 +44,14 @@ export class FlaskEmitter extends PythonPartialEmitter {
     const builder = new StringBuilder();
 
     this.imports.add("flask", "Flask");
-    for (const [moduleName, names] of sourceFile.imports.entries()) {
+    for (const [moduleName, names] of this.imports.getImports(sourceFile, ImportKind.regular)) {
       builder.push(code`from ${moduleName} import ${[...names].join(", ")}\n`);
     }
 
-    const deferredImports = sourceFile.meta["deferredImports"] as Map<string, Set<string>>;
-    if (deferredImports !== undefined) {
+    const deferredImports = this.imports.getImports(sourceFile, ImportKind.deferred);
+    if (deferredImports.size > 0) {
       builder.push(code`\nif TYPE_CHECKING:\n`);
-      for (const [moduleName, names] of deferredImports.entries()) {
+      for (const [moduleName, names] of deferredImports) {
         builder.push(code`${this.indent()}from ${moduleName} import ${[...names].join(", ")}\n`);
       }
     }
