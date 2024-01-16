@@ -3,6 +3,7 @@ import { FlaskEmitter } from "typespec-flask";
 import { EmitContext } from "@typespec/compiler";
 import { PythonServerEmitterOptions } from "./lib.js";
 import { AssetEmitter } from "@typespec/compiler/emitter-framework";
+import { PydanticEmitter } from "typespec-pydantic";
 
 export async function $onEmit(context: EmitContext<PythonServerEmitterOptions>) {
   const options = context.options;
@@ -27,6 +28,10 @@ function createPythonServerEmitter(
   async function emitPython() {
     initializeEmitters();
 
+    modelEmitter.emitProgram();
+    operationEmitter.emitProgram();
+    await modelEmitter.writeOutput();
+    await operationEmitter.writeOutput();
     //   try {
     //     const httpService = ignoreDiagnostics(getHttpService(program, service.type));
     //     reportIfNoRoutes(program, httpService.operations);
@@ -73,21 +78,8 @@ function createPythonServerEmitter(
     // }
 
     function initializeEmitters() {
-      //modelEmitter = context.getAssetEmitter(PydanticEmitter);
+      modelEmitter = context.getAssetEmitter(PydanticEmitter);
       operationEmitter = context.getAssetEmitter(FlaskEmitter);
-      const test = "best";
     }
   }
-
-  // async function loadEmitters(emitter: AssetEmitter<string, PythonServerEmitterOptions>) {
-  //   // ensure that both modelEmitter and operationEmitter are supplied
-  //   if (modelEmitterName === undefined && operationEmitterName === undefined) {
-  //     throw new Error("model-emitter and operation-emitter are both required");
-  //   } else if (modelEmitterName === undefined) {
-  //     throw new Error("model-emitter is required");
-  //   } else if (operationEmitterName === undefined) {
-  //     throw new Error("operation-emitter is required");
-  //   }
-  //   // TODO: Dynamically load emitters here, eventually
-  // }
 }
