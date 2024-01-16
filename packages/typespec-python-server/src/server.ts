@@ -1,17 +1,8 @@
-import { PydanticEmitter } from "typespec-pydantic";
+//import { PydanticEmitter } from "typespec-pydantic";
 import { FlaskEmitter } from "typespec-flask";
-import { EmitContext, Program } from "@typespec/compiler";
+import { EmitContext } from "@typespec/compiler";
 import { PythonServerEmitterOptions } from "./lib.js";
-import {
-  AssetEmitter,
-  CodeTypeEmitter,
-  Context,
-  EmittedSourceFile,
-  SourceFile,
-} from "@typespec/compiler/emitter-framework";
-import * as Module from "module";
-import { PydanticEmitterOptions } from "../../typespec-pydantic/dist/src/lib.js";
-import { FlaskEmitterOptions } from "../../typespec-flask/dist/src/lib.js";
+import { AssetEmitter } from "@typespec/compiler/emitter-framework";
 
 export async function $onEmit(context: EmitContext<PythonServerEmitterOptions>) {
   const options = context.options;
@@ -28,8 +19,8 @@ function createPythonServerEmitter(
   options: PythonServerEmitterOptions,
 ) {
   const program = context.program;
-  let modelEmitter: AssetEmitter<PydanticEmitter, PythonServerEmitterOptions>;
-  let operationEmitter: AssetEmitter<FlaskEmitter, PythonServerEmitterOptions>;
+  let modelEmitter: AssetEmitter<string, PythonServerEmitterOptions>;
+  let operationEmitter: AssetEmitter<string, PythonServerEmitterOptions>;
 
   return { emitPython };
 
@@ -82,27 +73,21 @@ function createPythonServerEmitter(
     // }
 
     function initializeEmitters() {
-      modelEmitter = context.getAssetEmitter(class extends PydanticEmitter {
-        constructor(emitter: AssetEmitter<string, PythonServerEmitterOptions>) {
-          super(emitter);
-        }
-      } as any);
-      operationEmitter = context.getAssetEmitter(class extends FlaskEmitter {
-        constructor(emitter: AssetEmitter<string, PythonServerEmitterOptions>) {
-          super(emitter);
-        }
-      } as any);
+      //modelEmitter = context.getAssetEmitter(PydanticEmitter);
+      operationEmitter = context.getAssetEmitter(FlaskEmitter);
+      const test = "best";
     }
-}
+  }
 
-// async function loadEmitters(emitter: AssetEmitter<string, PythonServerEmitterOptions>) {
-//   // ensure that both modelEmitter and operationEmitter are supplied
-//   if (modelEmitterName === undefined && operationEmitterName === undefined) {
-//     throw new Error("model-emitter and operation-emitter are both required");
-//   } else if (modelEmitterName === undefined) {
-//     throw new Error("model-emitter is required");
-//   } else if (operationEmitterName === undefined) {
-//     throw new Error("operation-emitter is required");
-//   }
-//   // TODO: Dynamically load emitters here, eventually
-// }
+  // async function loadEmitters(emitter: AssetEmitter<string, PythonServerEmitterOptions>) {
+  //   // ensure that both modelEmitter and operationEmitter are supplied
+  //   if (modelEmitterName === undefined && operationEmitterName === undefined) {
+  //     throw new Error("model-emitter and operation-emitter are both required");
+  //   } else if (modelEmitterName === undefined) {
+  //     throw new Error("model-emitter is required");
+  //   } else if (operationEmitterName === undefined) {
+  //     throw new Error("operation-emitter is required");
+  //   }
+  //   // TODO: Dynamically load emitters here, eventually
+  // }
+}
