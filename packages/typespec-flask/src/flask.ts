@@ -4,6 +4,7 @@ import {
   EmitContext,
   Interface,
   Model,
+  Namespace,
   NumericLiteral,
   Operation,
   Program,
@@ -40,10 +41,25 @@ export class FlaskEmitter extends PythonPartialEmitter {
     };
   }
 
+  /** Create a new source file for each namespace. */
+  namespaceContext(namespace: Namespace): Context {
+    if (namespace.name === "TypeSpec") {
+      return {};
+    }
+    const fullPath = getNamespaceFullName(namespace)
+      .split(".")
+      .map((seg) => this.toSnakeCase(seg))
+      .join("/");
+    const operationsFile = this.emitter.createSourceFile(`${fullPath}/operations.py`);
+    return {
+      scope: operationsFile.globalScope,
+    };
+  }
+
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
     const builder = new StringBuilder();
 
-    this.imports.add("flask", "Flask");
+    this.imports.add("flask", "Flask", ImportKind.regular, sourceFile);
     for (const [moduleName, names] of this.imports.getImports(sourceFile, ImportKind.regular)) {
       builder.push(code`from ${moduleName} import ${[...names].join(", ")}\n`);
     }
@@ -70,7 +86,7 @@ export class FlaskEmitter extends PythonPartialEmitter {
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
-    return this.declarations.declare(name, undefined);
+    return this.declarations.declare(name, undefined, true);
   }
 
   booleanLiteral(boolean: BooleanLiteral): EmitterOutput<string> {

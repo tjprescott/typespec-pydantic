@@ -16,9 +16,11 @@ export class DeclarationManager {
     return this.declarations.has(name) || this.deferred.has(name);
   }
 
-  declare(name: string, value?: string | StringBuilder) {
+  declare(name: string, value?: string | StringBuilder, omit: boolean = false) {
     this.declarations.add(name);
-    return this.emitter.result.declaration(name, value ?? "");
+    const decl = this.emitter.result.declaration(name, value ?? "");
+    decl.meta["omit"] = omit;
+    return decl;
   }
 
   defer(name: string, model: Model | Scalar) {

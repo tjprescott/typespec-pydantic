@@ -4,6 +4,7 @@ import { EmitContext } from "@typespec/compiler";
 import { PythonServerEmitterOptions } from "./lib.js";
 import { AssetEmitter } from "@typespec/compiler/emitter-framework";
 import { PydanticEmitter } from "typespec-pydantic";
+import { DeclarationKind } from "../../typespec-python/dist/src/declaration-util.js";
 
 export async function $onEmit(context: EmitContext<PythonServerEmitterOptions>) {
   const options = context.options;

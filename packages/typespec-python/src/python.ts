@@ -1,7 +1,17 @@
-import { IntrinsicType, Model, Scalar, Type, getDiscriminator, getDoc, getNamespaceFullName } from "@typespec/compiler";
+import {
+  IntrinsicType,
+  Model,
+  Scalar,
+  Type,
+  emitFile,
+  getDiscriminator,
+  getDoc,
+  getNamespaceFullName,
+} from "@typespec/compiler";
 import {
   AssetEmitter,
   CodeTypeEmitter,
+  Declaration,
   EmittedSourceFile,
   EmitterOutput,
   Scope,
@@ -309,6 +319,56 @@ export class PythonPartialEmitter extends CodeTypeEmitter {
           target: intrinsic,
         });
         return code`object`;
+    }
+  }
+
+  /** Matches __init__.py and models.py files together */
+  #matchSourceFiles(sourceFiles: SourceFile<string>[]): [SourceFile<string>, SourceFile<string>][] {
+    const matchedFiles = new Map<string, SourceFile<string>[]>();
+    for (const sf of sourceFiles) {
+      const path = sf.path;
+      const dir = path.substring(0, path.lastIndexOf("/"));
+      const files = matchedFiles.get(dir) ?? [];
+      // if this is an __init__.py file, add it to the end
+      if (path.endsWith("__init__.py")) {
+        files.push(sf);
+      } else {
+        // otherwise add it to the beginning
+        files.unshift(sf);
+      }
+      matchedFiles.set(dir, files);
+    }
+    return [...matchedFiles.values()].map((files) => [files[0], files[1]]);
+  }
+
+  /** Filters out declarations that should not actually be emitted. */
+  #filterDeclarations(declarations: Declaration<string>[]): Declaration<string>[] {
+    const filtered = declarations.filter((decl) => decl.meta["omit"] === false);
+    return filtered;
+  }
+
+  async writeOutput(sourceFiles: SourceFile<string>[]): Promise<void> {
+    const toEmit: EmittedSourceFile[] = [];
+
+    const sortedFiles = this.#matchSourceFiles(sourceFiles);
+    for (const [mainFile, initFile] of sortedFiles) {
+      const mainSf = await this.emitter.emitSourceFile(mainFile);
+      if (this.#filterDeclarations(mainFile.globalScope.declarations).length === 0) {
+        continue;
+      }
+      toEmit.push(mainSf);
+      if (initFile !== undefined) {
+        toEmit.push(await this.emitInitFile(initFile, mainFile));
+      }
+    }
+
+    if (!this.emitter.getProgram().compilerOptions.noEmit) {
+      for (const emittedSf of toEmit) {
+        await emitFile(this.emitter.getProgram(), {
+          path: emittedSf.path,
+          content: emittedSf.contents,
+        });
+      }
     }
   }
 }
