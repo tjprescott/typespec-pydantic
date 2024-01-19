@@ -4,7 +4,7 @@ import { EmitContext } from "@typespec/compiler";
 import { PythonServerEmitterOptions } from "./lib.js";
 import { AssetEmitter } from "@typespec/compiler/emitter-framework";
 import { PydanticEmitter } from "typespec-pydantic";
-import { DeclarationKind } from "../../typespec-python/dist/src/declaration-util.js";
+import { DeclarationManager2 } from "typespec-python";
 
 export async function $onEmit(context: EmitContext<PythonServerEmitterOptions>) {
   const options = context.options;
@@ -20,9 +20,9 @@ function createPythonServerEmitter(
   context: EmitContext<PythonServerEmitterOptions>,
   options: PythonServerEmitterOptions,
 ) {
-  const program = context.program;
   let modelEmitter: AssetEmitter<string, PythonServerEmitterOptions>;
   let operationEmitter: AssetEmitter<string, PythonServerEmitterOptions>;
+  const declarations = new DeclarationManager2();
 
   return { emitPython };
 
@@ -79,8 +79,20 @@ function createPythonServerEmitter(
     // }
 
     function initializeEmitters() {
-      modelEmitter = context.getAssetEmitter(PydanticEmitter);
-      operationEmitter = context.getAssetEmitter(FlaskEmitter);
+      modelEmitter = context.getAssetEmitter(
+        class extends PydanticEmitter {
+          constructor(emitter: AssetEmitter<string, Record<string, never>>) {
+            super(emitter, declarations);
+          }
+        },
+      );
+      operationEmitter = context.getAssetEmitter(
+        class extends FlaskEmitter {
+          constructor(emitter: AssetEmitter<string, Record<string, never>>) {
+            super(emitter, declarations);
+          }
+        },
+      );
     }
   }
 }

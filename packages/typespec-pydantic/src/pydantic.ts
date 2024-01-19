@@ -1,4 +1,4 @@
-import { PythonPartialEmitter, ImportKind } from "typespec-python";
+import { PythonPartialEmitter, ImportKind, DeclarationManager2, DeclarationKind } from "typespec-python";
 import {
   BooleanLiteral,
   EmitContext,
@@ -46,7 +46,14 @@ import { PydanticEmitterOptions, reportDiagnostic } from "./lib.js";
 import { getFields } from "./decorators.js";
 
 export async function $onEmit(context: EmitContext<PydanticEmitterOptions>) {
-  const assetEmitter = context.getAssetEmitter(PydanticEmitter);
+  const assetEmitter = context.getAssetEmitter(
+    class extends PydanticEmitter {
+      constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager2) {
+        super(emitter);
+        this.decls = declarations;
+      }
+    },
+  );
   assetEmitter.emitProgram({ emitTypeSpecNamespace: false });
   await assetEmitter.writeOutput();
 }
@@ -119,6 +126,11 @@ interface PydanticFieldMetadata {
 
 export class PydanticEmitter extends PythonPartialEmitter {
   private currNamespace: string[] = [];
+
+  constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager2) {
+    super(emitter);
+    this.decls = declarations;
+  }
 
   #emitFieldValue(value: string | StringBuilder | number | boolean | Type | string[] | null): string | StringBuilder {
     if (typeof value === "boolean") {
@@ -358,7 +370,9 @@ export class PydanticEmitter extends PythonPartialEmitter {
       builder.push(code`${this.indent()}pass`);
     }
     this.currNamespace.pop();
-    return this.declarations.declare(name, builder.reduce());
+    const decl = this.declarations.declare(name, builder.reduce());
+    this.decls?.register(this, decl, DeclarationKind.Model);
+    return decl;
   }
 
   modelLiteral(model: Model): EmitterOutput<string> {
@@ -442,7 +456,9 @@ export class PydanticEmitter extends PythonPartialEmitter {
     builder.push(code`class ${name}(Enum):\n`);
     this.emitDocs(builder, en);
     builder.push(code`${members}`);
-    return this.declarations.declare(name, builder.reduce());
+    const decl = this.declarations.declare(name, builder.reduce());
+    this.decls?.register(this, decl, DeclarationKind.Model);
+    return decl;
   }
 
   enumMembers(en: Enum): EmitterOutput<string> {
@@ -475,7 +491,9 @@ export class PydanticEmitter extends PythonPartialEmitter {
     builder.push(code`${this.indent()}root: List[${this.#emitTypeReference(elementType)}]\n\n`);
     builder.push(code`${this.indent()}def __iter__(self):\n${this.indent(2)}return iter(self.root)\n\n`);
     builder.push(code`${this.indent()}def __getitem__(self, item):\n${this.indent(2)}return self.root[item]\n\n`);
-    return this.declarations.declare(name, builder.reduce());
+    const decl = this.declarations.declare(name, builder.reduce());
+    this.decls?.register(this, decl, DeclarationKind.Model);
+    return decl;
   }
 
   arrayLiteral(array: Model, elementType: Type): EmitterOutput<string> {
@@ -593,7 +611,9 @@ export class PydanticEmitter extends PythonPartialEmitter {
   }
 
   unionDeclaration(union: Union, name: string): EmitterOutput<string> {
-    return this.declarations.declare(name, undefined);
+    const decl = this.declarations.declare(name, undefined, true);
+    this.decls?.register(this, decl, DeclarationKind.Model);
+    return decl;
   }
 
   unionInstantiation(union: Union, name: string): EmitterOutput<string> {

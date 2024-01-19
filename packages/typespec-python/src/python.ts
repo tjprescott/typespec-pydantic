@@ -20,13 +20,15 @@ import {
   code,
 } from "@typespec/compiler/emitter-framework";
 import { ImportManager, ImportKind } from "./import-util.js";
-import { DeclarationManager } from "./declaration-util.js";
+import { DeclarationManager, DeclarationManager2 } from "./declaration-util.js";
 import { reportDiagnostic } from "./lib.js";
 
 export class PythonPartialEmitter extends CodeTypeEmitter {
   protected imports: ImportManager;
 
   protected declarations: DeclarationManager;
+
+  protected decls?: DeclarationManager2;
 
   constructor(emitter: AssetEmitter<string, Record<string, never>>) {
     super(emitter);

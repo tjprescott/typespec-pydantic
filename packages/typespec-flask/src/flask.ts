@@ -1,4 +1,4 @@
-import { ImportKind, PythonPartialEmitter } from "typespec-python";
+import { DeclarationKind, DeclarationManager2, ImportKind, PythonPartialEmitter } from "typespec-python";
 import {
   BooleanLiteral,
   EmitContext,
@@ -14,6 +14,7 @@ import {
   getNamespaceFullName,
 } from "@typespec/compiler";
 import {
+  AssetEmitter,
   Context,
   EmittedSourceFile,
   EmitterOutput,
@@ -26,12 +27,24 @@ import { getOperationParameters, getRoutePath } from "@typespec/http";
 import { FlaskEmitterOptions } from "./lib.js";
 
 export async function $onEmit(context: EmitContext<FlaskEmitterOptions>) {
-  const assetEmitter = context.getAssetEmitter(FlaskEmitter);
+  const assetEmitter = context.getAssetEmitter(
+    class extends FlaskEmitter {
+      constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager2) {
+        super(emitter);
+        this.decls = declarations;
+      }
+    },
+  );
   assetEmitter.emitProgram();
   await assetEmitter.writeOutput();
 }
 
 export class FlaskEmitter extends PythonPartialEmitter {
+  constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager2) {
+    super(emitter);
+    this.decls = declarations;
+  }
+
   programContext(program: Program): Context {
     const options = this.emitter.getOptions();
     const outFile = options["output-file"] ?? "operations.py";
@@ -86,7 +99,12 @@ export class FlaskEmitter extends PythonPartialEmitter {
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
-    return this.declarations.declare(name, undefined, true);
+    const namespace = this.buildNamespaceFromModel(model);
+    const existing = this.decls?.getDeclaration(`${namespace}.${name}`);
+    if (!existing) {
+      throw new Error(`Declaration for ${namespace}.${name} not found`);
+    }
+    return existing;
   }
 
   booleanLiteral(boolean: BooleanLiteral): EmitterOutput<string> {
@@ -153,7 +171,9 @@ export class FlaskEmitter extends PythonPartialEmitter {
     }
     builder.push(":\n");
     builder.push(`${this.indent(1)}pass\n`);
-    return this.declarations.declare(name, builder.reduce());
+    const decl = this.declarations.declare(name, builder.reduce());
+    this.decls?.register(this, decl, DeclarationKind.Operation);
+    return decl;
   }
 
   operationParameters(operation: Operation, parameters: Model): EmitterOutput<string> {

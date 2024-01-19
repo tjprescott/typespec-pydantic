@@ -1,4 +1,5 @@
 // Re-export $lib to the compiler can get access to it and register your library correctly.
 export { $lib } from "./lib.js";
 export * from "./python.js";
-export { ImportKind } from "./import-util.js";
+export * from "./import-util.js";
+export * from "./declaration-util.js";
