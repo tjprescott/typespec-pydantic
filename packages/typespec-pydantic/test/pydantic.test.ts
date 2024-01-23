@@ -218,6 +218,43 @@ describe("typespec-pydantic: core", () => {
       compare(bModelExpect, results[2].contents, false);
       compare(cModelExpect, results[4].contents, false);
     });
+
+    it("supports anonymous template instantiations", async () => {
+      const input = `
+        namespace Widgets {
+          model Widget<T> {
+            contents: T;
+          }
+
+          model IntWidget is Widget<int32>;
+          
+          namespace Parts {
+            model WidgetPart {
+              widget: Widget<string>;
+            };  
+          }
+        }`;
+      const widgetsExpect = `
+        from pydantic import BaseModel
+
+        class IntWidget(BaseModel):
+            contents: int
+            
+        class WidgetString(BaseModel):
+            contents: str`;
+      const partsExpect = `
+        from pydantic import BaseModel
+        from widgets import WidgetString
+
+        class ModelPart(BaseModel):
+            widget: WidgetString
+        `;
+      const [results, diagnostics] = await pydanticOutputFor(input);
+      expectDiagnosticEmpty(diagnostics);
+      strictEqual(results.length, 4);
+      compare(widgetsExpect, results[0].contents, false);
+      compare(partsExpect, results[2].contents, false);
+    });
   });
 
   describe("models", () => {

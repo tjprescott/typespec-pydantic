@@ -286,6 +286,18 @@ export class PythonPartialEmitter extends CodeTypeEmitter {
     return destPath.split("/").slice(0, -1).join(".");
   }
 
+  /** Accepts a path and returns the fully-qualified namespace */
+  buildNamespaceFromPath(path: string): string | undefined {
+    if (path.startsWith("/")) {
+      return undefined;
+    }
+    const segments = path.split("/");
+    if (segments.length > 2) {
+      return segments.slice(1, -1).join(".");
+    }
+    throw new Error(`Invalid path: ${path}`);
+  }
+
   /** Emits docs for a given type. */
   emitDocs(builder: StringBuilder, type: Type) {
     const program = this.emitter.getProgram();

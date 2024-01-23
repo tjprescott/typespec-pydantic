@@ -306,8 +306,14 @@ export class PydanticEmitter extends PythonPartialEmitter {
       emittedSourceFile.contents += decl.value + "\n\n";
     }
 
+    const sfNs = this.buildNamespaceFromPath(sourceFile.path);
+
     // emit deferred declarations
     for (const item of this.declarations!.filter((decl) => decl.isDeferred && decl.omit === false)) {
+      // only render deferred declarations that are in relevant to the source file
+      const itemNs = item.path.split(".").slice(0, -1).join(".");
+      if (itemNs !== sfNs) continue;
+
       if (item.source?.kind === "Model") {
         this.imports.add("pydantic", "BaseModel", ImportKind.regular, sourceFile);
         const props = this.emitter.emitModelProperties(item.source);
@@ -422,6 +428,13 @@ export class PydanticEmitter extends PythonPartialEmitter {
     const knownValues = getKnownValues(this.emitter.getProgram(), property);
     let type: string | StringBuilder | undefined = undefined;
     type = this.#emitTypeReference(property.type);
+
+    const sourceNs = property.model ? this.buildNamespaceFromModel(property.model) : undefined;
+    const destNs = property.type.kind === "Model" ? this.buildNamespaceFromModel(property.type) : undefined;
+    if (sourceNs !== undefined && destNs !== undefined && sourceNs !== destNs) {
+      this.imports.add(destNs, type.toString());
+    }
+
     // don't emit anything if type is `never`
     if (property.type.kind === "Intrinsic" && property.type.name === "never") return code``;
 

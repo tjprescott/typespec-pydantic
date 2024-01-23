@@ -4,7 +4,7 @@ import { EmitContext } from "@typespec/compiler";
 import { PythonServerEmitterOptions } from "./lib.js";
 import { AssetEmitter } from "@typespec/compiler/emitter-framework";
 import { PydanticEmitter } from "typespec-pydantic";
-import { DeclarationManager2 } from "typespec-python";
+import { DeclarationManager } from "typespec-python";
 
 export async function $onEmit(context: EmitContext<PythonServerEmitterOptions>) {
   const options = context.options;
@@ -22,7 +22,7 @@ function createPythonServerEmitter(
 ) {
   let modelEmitter: AssetEmitter<string, PythonServerEmitterOptions>;
   let operationEmitter: AssetEmitter<string, PythonServerEmitterOptions>;
-  const declarations = new DeclarationManager2();
+  const declarations = new DeclarationManager();
 
   return { emitPython };
 
