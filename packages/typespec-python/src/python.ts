@@ -20,20 +20,17 @@ import {
   code,
 } from "@typespec/compiler/emitter-framework";
 import { ImportManager, ImportKind } from "./import-util.js";
-import { DeclarationManager, DeclarationManager2 } from "./declaration-util.js";
+import { DeclarationManager } from "./declaration-util.js";
 import { reportDiagnostic } from "./lib.js";
 
 export class PythonPartialEmitter extends CodeTypeEmitter {
   protected imports: ImportManager;
 
-  protected declarations: DeclarationManager;
-
-  protected decls?: DeclarationManager2;
+  protected declarations?: DeclarationManager;
 
   constructor(emitter: AssetEmitter<string, Record<string, never>>) {
     super(emitter);
     this.imports = new ImportManager(emitter);
-    this.declarations = new DeclarationManager(emitter);
   }
 
   /** Convert a TypeSpec scalar name to the relevant Python equivalent. */
@@ -264,7 +261,7 @@ export class PythonPartialEmitter extends CodeTypeEmitter {
   }
 
   /** Construct a fully-qualified namespace string from a model. */
-  buildNamespaceFromModel(model: Model): string | undefined {
+  buildNamespaceFromModel(model: Model | Scalar): string | undefined {
     if (model.namespace === undefined) return undefined;
     const fullNsName = getNamespaceFullName(model.namespace);
     return fullNsName
@@ -344,7 +341,7 @@ export class PythonPartialEmitter extends CodeTypeEmitter {
   }
 
   /** Filters out declarations that should not actually be emitted. */
-  #filterDeclarations(declarations: Declaration<string>[]): Declaration<string>[] {
+  #filterOmittedDeclarations(declarations: Declaration<string>[]): Declaration<string>[] {
     const filtered = declarations.filter((decl) => decl.meta["omit"] === false);
     return filtered;
   }
@@ -355,7 +352,7 @@ export class PythonPartialEmitter extends CodeTypeEmitter {
     const sortedFiles = this.#matchSourceFiles(sourceFiles);
     for (const [mainFile, initFile] of sortedFiles) {
       const mainSf = await this.emitter.emitSourceFile(mainFile);
-      if (this.#filterDeclarations(mainFile.globalScope.declarations).length === 0) {
+      if (this.#filterOmittedDeclarations(mainFile.globalScope.declarations).length === 0) {
         continue;
       }
       toEmit.push(mainSf);
@@ -372,5 +369,10 @@ export class PythonPartialEmitter extends CodeTypeEmitter {
         });
       }
     }
+  }
+
+  /** Returns the asset emitter. */
+  getAssetEmitter(): AssetEmitter<string, Record<string, never>> {
+    return this.emitter;
   }
 }

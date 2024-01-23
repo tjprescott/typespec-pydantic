@@ -1,4 +1,4 @@
-import { DeclarationKind, DeclarationManager2, ImportKind, PythonPartialEmitter } from "typespec-python";
+import { DeclarationKind, DeclarationManager, ImportKind, PythonPartialEmitter } from "typespec-python";
 import {
   BooleanLiteral,
   EmitContext,
@@ -29,9 +29,9 @@ import { FlaskEmitterOptions } from "./lib.js";
 export async function $onEmit(context: EmitContext<FlaskEmitterOptions>) {
   const assetEmitter = context.getAssetEmitter(
     class extends FlaskEmitter {
-      constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager2) {
+      constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
         super(emitter);
-        this.decls = declarations;
+        this.declarations = declarations;
       }
     },
   );
@@ -40,9 +40,9 @@ export async function $onEmit(context: EmitContext<FlaskEmitterOptions>) {
 }
 
 export class FlaskEmitter extends PythonPartialEmitter {
-  constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager2) {
+  constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
     super(emitter);
-    this.decls = declarations;
+    this.declarations = declarations;
   }
 
   programContext(program: Program): Context {
@@ -100,7 +100,7 @@ export class FlaskEmitter extends PythonPartialEmitter {
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
     const namespace = this.buildNamespaceFromModel(model);
-    const existing = this.decls?.getDeclaration(`${namespace}.${name}`);
+    const existing = this.declarations?.getDeclaration(`${namespace}.${name}`);
     if (!existing) {
       throw new Error(`Declaration for ${namespace}.${name} not found`);
     }
@@ -171,9 +171,12 @@ export class FlaskEmitter extends PythonPartialEmitter {
     }
     builder.push(":\n");
     builder.push(`${this.indent(1)}pass\n`);
-    const decl = this.declarations.declare(name, builder.reduce());
-    this.decls?.register(this, decl, DeclarationKind.Operation);
-    return decl;
+    return this.declarations!.declare(this, {
+      name: name,
+      kind: DeclarationKind.Operation,
+      value: builder.reduce(),
+      omit: false,
+    });
   }
 
   operationParameters(operation: Operation, parameters: Model): EmitterOutput<string> {

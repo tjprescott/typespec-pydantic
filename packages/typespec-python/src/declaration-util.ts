@@ -1,37 +1,6 @@
-import { Model, Scalar } from "@typespec/compiler";
-import { AssetEmitter, StringBuilder, Declaration } from "@typespec/compiler/emitter-framework";
+import { Declaration, StringBuilder } from "@typespec/compiler/emitter-framework";
 import { PythonPartialEmitter } from "./python.js";
-
-export class DeclarationManager {
-  private declarations = new Set<string>();
-
-  private deferred = new Map<string, Model | Scalar>();
-
-  private emitter: AssetEmitter<string, Record<string, never>>;
-
-  constructor(emitter: AssetEmitter<string, Record<string, never>>) {
-    this.emitter = emitter;
-  }
-
-  has(name: string): boolean {
-    return this.declarations.has(name) || this.deferred.has(name);
-  }
-
-  declare(name: string, value?: string | StringBuilder, omit: boolean = false) {
-    this.declarations.add(name);
-    const decl = this.emitter.result.declaration(name, value ?? "");
-    decl.meta["omit"] = omit;
-    return decl;
-  }
-
-  defer(name: string, model: Model | Scalar) {
-    this.deferred.set(name, model);
-  }
-
-  getDeferred(): Map<string, Model | Scalar> {
-    return this.deferred;
-  }
-}
+import { Model, Scalar } from "@typespec/compiler";
 
 export enum DeclarationKind {
   Model,
@@ -42,24 +11,66 @@ export interface DeclarationMetadata {
   name: string;
   kind: DeclarationKind;
   path: string;
-  decl: Declaration<string>;
+  decl?: Declaration<string>;
+  omit: boolean;
+  isDeferred: boolean;
+  source?: Model | Scalar;
 }
 
-export class DeclarationManager2 {
+export interface DeclarationOptions {
+  name: string;
+  kind: DeclarationKind;
+  value?: string | StringBuilder;
+  omit: boolean;
+}
+
+export interface DeferredDeclarationOptions {
+  name: string;
+  kind: DeclarationKind;
+  source: Model | Scalar;
+  omit: boolean;
+}
+
+export class DeclarationManager {
   private declarations = new Map<string, DeclarationMetadata>();
 
-  register(emitter: PythonPartialEmitter, decl: Declaration<string>, kind: DeclarationKind) {
+  declare(emitter: PythonPartialEmitter, options: DeclarationOptions): Declaration<string> {
+    const decl = emitter.getAssetEmitter().result.declaration(options.name, options.value ?? "");
     const path = emitter.buildNamespaceFromScope(decl.scope);
-    const name = decl.name;
-    this.declarations.set(`${path}.${name}`, {
-      name: name,
-      kind: kind,
+    decl.meta["omit"] = options.omit;
+    this.declarations.set(`${path}.${options.name}`, {
+      name: options.name,
+      kind: options.kind,
       path: path,
       decl: decl,
+      omit: options.omit,
+      isDeferred: false,
+      source: undefined,
+    });
+    return decl;
+  }
+
+  defer(path: string, options: DeferredDeclarationOptions) {
+    this.declarations.set(`${path}.${options.name}`, {
+      name: options.name,
+      kind: options.kind,
+      path: path,
+      decl: undefined,
+      omit: options.omit,
+      isDeferred: true,
+      source: options.source,
     });
   }
 
   getDeclaration(fullPath: string): Declaration<string> | undefined {
     return this.declarations.get(fullPath)?.decl;
+  }
+
+  has(name: string): boolean {
+    return this.declarations.has(name);
+  }
+
+  filter(predicate: (decl: DeclarationMetadata) => boolean): DeclarationMetadata[] {
+    return Array.from(this.declarations.values()).filter(predicate);
   }
 }
