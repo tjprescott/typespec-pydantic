@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 const githubUrl = `https://github.com/tjprescott/typespec-pydantic`;
 const config = defineConfig(
   definePlaygroundViteConfig({
-    defaultEmitter: "typespec-pydantic",
+    defaultEmitter: "typespec-python-server",
     libraries: [
       "@typespec/compiler",
       "@typespec/http",
@@ -15,17 +15,18 @@ const config = defineConfig(
       "@azure-tools/typespec-autorest",
       "@azure-tools/typespec-azure-resource-manager",
       "@azure-tools/typespec-client-generator-core",
+      "typespec-python-server",
       "typespec-pydantic",
       "typespec-flask",
     ],
     samples: {
       "Basic Sample": {
         filename: "samples/basic.tsp",
-        preferredEmitter: "typespec-pydantic",
+        preferredEmitter: "typespec-python-server",
       },
       "Azure Sample": {
         filename: "samples/azure.tsp",
-        preferredEmitter: "typespec-pydantic",
+        preferredEmitter: "typespec-python-server",
       },
     },
     links: {

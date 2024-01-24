@@ -9,6 +9,6 @@ const packageRoot = resolve(__dirname, "..");
 await buildSamples_experimental(packageRoot, resolve(__dirname, "dist/samples.js"), {
   Basic: {
     filename: "samples/basic.tsp",
-    preferredEmitter: "typespec-pydantic",
+    preferredEmitter: "typespec-python-server",
   },
 });

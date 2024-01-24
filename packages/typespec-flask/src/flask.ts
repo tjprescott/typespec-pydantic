@@ -1,15 +1,12 @@
 import { DeclarationKind, DeclarationManager, ImportKind, PythonPartialEmitter } from "typespec-python";
 import {
-  BooleanLiteral,
   EmitContext,
   Interface,
   Model,
   Namespace,
-  NumericLiteral,
   Operation,
   Program,
   Scalar,
-  StringLiteral,
   Type,
   getNamespaceFullName,
 } from "@typespec/compiler";
@@ -31,11 +28,11 @@ export async function $onEmit(context: EmitContext<FlaskEmitterOptions>) {
     class extends FlaskEmitter {
       constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
         super(emitter);
-        this.declarations = declarations;
+        this.declarations = new DeclarationManager();
       }
     },
   );
-  assetEmitter.emitProgram();
+  assetEmitter.emitProgram({ emitTypeSpecNamespace: false });
   await assetEmitter.writeOutput();
 }
 
@@ -100,24 +97,17 @@ export class FlaskEmitter extends PythonPartialEmitter {
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
     const namespace = this.buildNamespaceFromModel(model);
-    const existing = this.declarations?.getDeclaration(`${namespace}.${name}`);
+    const fullPath = namespace === "" ? name : `${namespace}.${name}`;
+    const existing = this.declarations!.getDeclaration(fullPath);
     if (!existing) {
-      throw new Error(`Declaration for ${namespace}.${name} not found`);
+      return this.declarations!.declare(this, {
+        name: name,
+        kind: DeclarationKind.Model,
+        value: undefined,
+        omit: true,
+      });
     }
     return existing;
-  }
-
-  booleanLiteral(boolean: BooleanLiteral): EmitterOutput<string> {
-    const val = boolean.value ? "True" : "False";
-    return code`${val}`;
-  }
-
-  numericLiteral(number: NumericLiteral): EmitterOutput<string> {
-    return code`${number.value.toString()}`;
-  }
-
-  stringLiteral(string: StringLiteral): EmitterOutput<string> {
-    return code`"${string.value}"`;
   }
 
   #emitScalar(scalar: Scalar, name: string): string | Placeholder<string> {

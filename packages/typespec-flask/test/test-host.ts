@@ -3,28 +3,28 @@ import { FlaskTestLibrary } from "../src/testing/index.js";
 import { strictEqual } from "assert";
 import { Diagnostic } from "@typespec/compiler";
 
-export async function createPydanticTestHost() {
+export async function createFlaskTestHost() {
   return createTestHost({
     libraries: [FlaskTestLibrary],
   });
 }
 
-export async function createPydanticTestRunner() {
-  const host = await createPydanticTestHost();
+export async function createFlaskTestRunner() {
+  const host = await createFlaskTestHost();
   return createTestWrapper(host, {
-    autoUsings: ["Pydantic"],
+    autoUsings: ["Flask"],
     compilerOptions: {
-      emit: ["typespec-pydantic"],
+      emit: ["typespec-flask"],
     },
   });
 }
 
-export async function pydanticOutputFor(code: string): Promise<[string[], readonly Diagnostic[]]> {
-  const runner = await createPydanticTestRunner();
+export async function flaskOutputFor(code: string): Promise<[string[], readonly Diagnostic[]]> {
+  const runner = await createFlaskTestRunner();
   const outPath = resolveVirtualPath("/test.py");
   const [_, diagnostics] = await runner.compileAndDiagnose(code, {
     noEmit: false,
-    emitters: { "typespec-pydantic": { "output-file": outPath } },
+    emitters: { "typespec-flask": { "output-file": outPath } },
     miscOptions: { "disable-linter": true },
   });
   const rawText = runner.fs.get(outPath);

@@ -1,8 +1,13 @@
 import {
+  BooleanLiteral,
   IntrinsicType,
   Model,
+  NumericLiteral,
   Scalar,
+  StringLiteral,
+  Tuple,
   Type,
+  Union,
   emitFile,
   getDiscriminator,
   getDoc,
@@ -14,6 +19,7 @@ import {
   Declaration,
   EmittedSourceFile,
   EmitterOutput,
+  Placeholder,
   Scope,
   SourceFile,
   StringBuilder,
@@ -23,7 +29,14 @@ import { ImportManager, ImportKind } from "./import-util.js";
 import { DeclarationManager } from "./declaration-util.js";
 import { reportDiagnostic } from "./lib.js";
 
+interface UnionVariantMetadata {
+  type: Type;
+  value: string | StringBuilder;
+}
+
 export class PythonPartialEmitter extends CodeTypeEmitter {
+  protected currNamespace: string[] = [];
+
   protected imports: ImportManager;
 
   protected declarations?: DeclarationManager;
@@ -312,6 +325,38 @@ export class PythonPartialEmitter extends CodeTypeEmitter {
     }
   }
 
+  arrayLiteral(array: Model, elementType: Type): EmitterOutput<string> {
+    this.imports.add("typing", "List");
+    return code`List[${this.emitTypeReference(elementType)}]`;
+  }
+
+  booleanLiteral(boolean: BooleanLiteral): EmitterOutput<string> {
+    const val = boolean.value ? "True" : "False";
+    return code`${val}`;
+  }
+
+  numericLiteral(number: NumericLiteral): EmitterOutput<string> {
+    return code`${number.value.toString()}`;
+  }
+
+  stringLiteral(string: StringLiteral): EmitterOutput<string> {
+    return code`"${string.value}"`;
+  }
+
+  tupleLiteral(tuple: Tuple): EmitterOutput<string> {
+    const builder = new StringBuilder();
+    let i = 0;
+    const length = tuple.values.length;
+    this.imports.add("typing", "Tuple");
+    builder.push(code`Tuple[`);
+    for (const item of tuple.values) {
+      builder.push(code`${this.emitTypeReference(item)}`);
+      if (++i < length) builder.push(code`, `);
+      else builder.push(code`]`);
+    }
+    return builder.reduce();
+  }
+
   intrinsic(intrinsic: IntrinsicType, name: string): EmitterOutput<string> {
     switch (name) {
       case "never":
@@ -329,6 +374,93 @@ export class PythonPartialEmitter extends CodeTypeEmitter {
         });
         return code`object`;
     }
+  }
+
+  unionLiteral(union: Union): EmitterOutput<string> {
+    return this.emitter.emitUnionVariants(union);
+  }
+
+  /**
+   * Returns a string representation of the union type. If all variants are literals
+   * it will return only `Literal[...]`. If all variants are non-literals it will
+   * return only `Union[...]`. If there are both literal and non-literal variants
+   * the literals will be listed first (`Union[Literal[...], ...]`).
+   */
+  unionVariants(union: Union): EmitterOutput<string> {
+    const builder = new StringBuilder();
+    const literals: UnionVariantMetadata[] = [];
+    const nonLiterals: UnionVariantMetadata[] = [];
+    for (const variant of union.variants.values()) {
+      const isLit = this.isLiteral(variant.type);
+      if (isLit) {
+        literals.push({
+          type: variant.type,
+          value: code`${this.emitTypeReference(variant.type)}`,
+        });
+      } else {
+        // value is already represented in nonLiterals array, don't add it again
+        const value = code`${this.emitTypeReference(variant.type)}`;
+        if (nonLiterals.some((val) => val.value === value)) continue;
+        nonLiterals.push({
+          type: variant.type,
+          value: value,
+        });
+      }
+    }
+    const hasLiterals = literals.length > 0;
+    const hasNonLiterals = nonLiterals.length > 0;
+    if (!hasLiterals && !hasNonLiterals) {
+      reportDiagnostic(this.emitter.getProgram(), {
+        code: "unexpected-error",
+        target: union,
+      });
+    }
+    if (hasNonLiterals) {
+      this.imports.add("typing", "Union");
+      builder.push(code`Union[`);
+    }
+    if (hasLiterals) {
+      this.imports.add("typing", "Literal");
+      builder.push(code`Literal[`);
+      let i = 0;
+      const length = literals.length;
+      for (const val of literals) {
+        builder.push(val.value);
+        if (++i < length) builder.push(code`, `);
+      }
+      builder.push(code`]`);
+    }
+    if (hasNonLiterals) {
+      let i = 0;
+      const length = nonLiterals.length;
+      if (hasLiterals) {
+        builder.push(code`, `);
+      }
+      for (const val of nonLiterals) {
+        builder.push(val.value);
+        if (++i < length) builder.push(code`, `);
+      }
+      builder.push(code`]`);
+    }
+    return builder.reduce();
+  }
+
+  emitTypeReference(type: Type) {
+    const sourceNs = this.currNamespace.slice(-1)[0];
+    const destNs = this.buildNamespaceFromModel(type as Model);
+    if (sourceNs !== destNs && destNs !== undefined && destNs !== "type_spec") {
+      if (type.kind === "Model") {
+        const templateArgs = type.templateMapper?.args;
+        if (templateArgs === undefined || templateArgs.length === 0) {
+          this.imports.add(destNs, type.name);
+        }
+      }
+    }
+    const value = this.emitter.emitTypeReference(type);
+    if (value.kind === "code" && value.value instanceof Placeholder && (value.value as any).segments === undefined) {
+      return code`"${value}"`;
+    }
+    return code`${value}`;
   }
 
   /** Matches __init__.py and models.py files together */

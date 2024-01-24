@@ -1,19 +1,15 @@
 import { PythonPartialEmitter, ImportKind, DeclarationManager, DeclarationKind } from "typespec-python";
 import {
-  BooleanLiteral,
   EmitContext,
   Enum,
   EnumMember,
   Interface,
-  IntrinsicType,
   Model,
   ModelProperty,
   Namespace,
-  NumericLiteral,
   Operation,
   Program,
   Scalar,
-  StringLiteral,
   Tuple,
   Type,
   Union,
@@ -42,7 +38,7 @@ import {
   StringBuilder,
   code,
 } from "@typespec/compiler/emitter-framework";
-import { PydanticEmitterOptions, reportDiagnostic } from "./lib.js";
+import { PydanticEmitterOptions } from "./lib.js";
 import { getFields } from "./decorators.js";
 
 export async function $onEmit(context: EmitContext<PydanticEmitterOptions>) {
@@ -56,11 +52,6 @@ export async function $onEmit(context: EmitContext<PydanticEmitterOptions>) {
   );
   assetEmitter.emitProgram({ emitTypeSpecNamespace: false });
   await assetEmitter.writeOutput();
-}
-
-interface UnionVariantMetadata {
-  type: Type;
-  value: string | StringBuilder;
 }
 
 /// Metadata for a Pydantic field.
@@ -125,8 +116,6 @@ interface PydanticFieldMetadata {
 }
 
 export class PydanticEmitter extends PythonPartialEmitter {
-  private currNamespace: string[] = [];
-
   constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
     super(emitter);
     this.declarations = declarations;
@@ -147,7 +136,7 @@ export class PydanticEmitter extends PythonPartialEmitter {
     } else if (value === null) {
       return code`None`;
     } else {
-      return code`${this.#emitTypeReference(value as Type)}`;
+      return code`${this.emitTypeReference(value as Type)}`;
     }
   }
 
@@ -344,24 +333,6 @@ export class PydanticEmitter extends PythonPartialEmitter {
     return super.circularReference(target, scope, cycle);
   }
 
-  #emitTypeReference(type: Type) {
-    const sourceNs = this.currNamespace.slice(-1)[0];
-    const destNs = this.buildNamespaceFromModel(type as Model);
-    if (sourceNs !== destNs && destNs !== undefined && destNs !== "type_spec") {
-      if (type.kind === "Model") {
-        const templateArgs = type.templateMapper?.args;
-        if (templateArgs === undefined || templateArgs.length === 0) {
-          this.imports.add(destNs, type.name);
-        }
-      }
-    }
-    const value = this.emitter.emitTypeReference(type);
-    if (value.kind === "code" && value.value instanceof Placeholder && (value.value as any).segments === undefined) {
-      return code`"${value}"`;
-    }
-    return code`${value}`;
-  }
-
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
     const namespace = this.buildNamespaceFromModel(model);
     if (namespace !== undefined) {
@@ -399,7 +370,7 @@ export class PydanticEmitter extends PythonPartialEmitter {
     if (model.name === "Record") {
       const type = model.templateMapper?.args[0];
       this.imports.add("typing", "Dict");
-      return code`Dict[str, ${type ? this.#emitTypeReference(type) : "None"}]`;
+      return code`Dict[str, ${type ? this.emitTypeReference(type) : "None"}]`;
     } else {
       const modelName = this.transformReservedName(name ?? model.name);
       const namespace = this.buildNamespaceFromModel(model);
@@ -432,7 +403,7 @@ export class PydanticEmitter extends PythonPartialEmitter {
     const isOptional = property.optional;
     const knownValues = getKnownValues(this.emitter.getProgram(), property);
     let type: string | StringBuilder | undefined = undefined;
-    type = this.#emitTypeReference(property.type);
+    type = this.emitTypeReference(property.type);
 
     const sourceNs = property.model ? this.buildNamespaceFromModel(property.model) : undefined;
     const destNs = property.type.kind === "Model" ? this.buildNamespaceFromModel(property.type) : undefined;
@@ -462,7 +433,7 @@ export class PydanticEmitter extends PythonPartialEmitter {
     if (property.type.kind === "Union") {
       builder.push(code`${this.emitter.emitUnionVariants(property.type)}`);
     } else if (property.type.kind === "UnionVariant") {
-      builder.push(code`${this.#emitTypeReference(property.type.type)}`);
+      builder.push(code`${this.emitTypeReference(property.type.type)}`);
     } else if (property.type.kind === "Scalar" && knownValues !== undefined) {
       builder.push(code`Union[${type}, ${knownValues.name}]`);
     } else {
@@ -481,7 +452,7 @@ export class PydanticEmitter extends PythonPartialEmitter {
   }
 
   modelPropertyReference(property: ModelProperty): EmitterOutput<string> {
-    return code`${this.#emitTypeReference(property.type)}`;
+    return code`${this.emitTypeReference(property.type)}`;
   }
 
   enumDeclaration(en: Enum, name: string): EmitterOutput<string> {
@@ -526,7 +497,7 @@ export class PydanticEmitter extends PythonPartialEmitter {
     this.imports.add("pydantic", "RootModel");
     this.imports.add("typing", "List");
     builder.push(code`class ${name}(RootModel):\n`);
-    builder.push(code`${this.indent()}root: List[${this.#emitTypeReference(elementType)}]\n\n`);
+    builder.push(code`${this.indent()}root: List[${this.emitTypeReference(elementType)}]\n\n`);
     builder.push(code`${this.indent()}def __iter__(self):\n${this.indent(2)}return iter(self.root)\n\n`);
     builder.push(code`${this.indent()}def __getitem__(self, item):\n${this.indent(2)}return self.root[item]\n\n`);
     return this.declarations!.declare(this, {
@@ -535,43 +506,6 @@ export class PydanticEmitter extends PythonPartialEmitter {
       value: builder.reduce(),
       omit: false,
     });
-  }
-
-  arrayLiteral(array: Model, elementType: Type): EmitterOutput<string> {
-    this.imports.add("typing", "List");
-    return code`List[${this.#emitTypeReference(elementType)}]`;
-  }
-
-  booleanLiteral(boolean: BooleanLiteral): EmitterOutput<string> {
-    const val = boolean.value ? "True" : "False";
-    return code`${val}`;
-  }
-
-  numericLiteral(number: NumericLiteral): EmitterOutput<string> {
-    return code`${number.value.toString()}`;
-  }
-
-  stringLiteral(string: StringLiteral): EmitterOutput<string> {
-    return code`"${string.value}"`;
-  }
-
-  intrinsic(intrinsic: IntrinsicType, name: string): EmitterOutput<string> {
-    switch (name) {
-      case "never":
-        // Unsupported: See `intrinsic-type-unsupported` rule
-        return this.emitter.result.none();
-      case "unknown":
-        return code`object`;
-      case "null":
-      case "void":
-        return code`None`;
-      default:
-        reportDiagnostic(this.emitter.getProgram(), {
-          code: "unexpected-error",
-          target: intrinsic,
-        });
-        return code`object`;
-    }
   }
 
   #emitScalar(scalar: Scalar, name: string, sourceFile?: SourceFile<string>): string | Placeholder<string> {
@@ -644,20 +578,6 @@ export class PydanticEmitter extends PythonPartialEmitter {
     return this.emitter.result.none();
   }
 
-  tupleLiteral(tuple: Tuple): EmitterOutput<string> {
-    const builder = new StringBuilder();
-    let i = 0;
-    const length = tuple.values.length;
-    this.imports.add("typing", "Tuple");
-    builder.push(code`Tuple[`);
-    for (const item of tuple.values) {
-      builder.push(code`${this.#emitTypeReference(item)}`);
-      if (++i < length) builder.push(code`, `);
-      else builder.push(code`]`);
-    }
-    return builder.reduce();
-  }
-
   unionDeclaration(union: Union, name: string): EmitterOutput<string> {
     return this.declarations!.declare(this, {
       name: name,
@@ -669,74 +589,5 @@ export class PydanticEmitter extends PythonPartialEmitter {
 
   unionInstantiation(union: Union, name: string): EmitterOutput<string> {
     return this.emitter.emitUnionVariants(union);
-  }
-
-  unionLiteral(union: Union): EmitterOutput<string> {
-    return this.emitter.emitUnionVariants(union);
-  }
-
-  /**
-   * Returns a string representation of the union type. If all variants are literals
-   * it will return only `Literal[...]`. If all variants are non-literals it will
-   * return only `Union[...]`. If there are both literal and non-literal variants
-   * the literals will be listed first (`Union[Literal[...], ...]`).
-   */
-  unionVariants(union: Union): EmitterOutput<string> {
-    const builder = new StringBuilder();
-    const literals: UnionVariantMetadata[] = [];
-    const nonLiterals: UnionVariantMetadata[] = [];
-    for (const variant of union.variants.values()) {
-      const isLit = this.isLiteral(variant.type);
-      if (isLit) {
-        literals.push({
-          type: variant.type,
-          value: code`${this.#emitTypeReference(variant.type)}`,
-        });
-      } else {
-        // value is already represented in nonLiterals array, don't add it again
-        const value = code`${this.#emitTypeReference(variant.type)}`;
-        if (nonLiterals.some((val) => val.value === value)) continue;
-        nonLiterals.push({
-          type: variant.type,
-          value: value,
-        });
-      }
-    }
-    const hasLiterals = literals.length > 0;
-    const hasNonLiterals = nonLiterals.length > 0;
-    if (!hasLiterals && !hasNonLiterals) {
-      reportDiagnostic(this.emitter.getProgram(), {
-        code: "unexpected-error",
-        target: union,
-      });
-    }
-    if (hasNonLiterals) {
-      this.imports.add("typing", "Union");
-      builder.push(code`Union[`);
-    }
-    if (hasLiterals) {
-      this.imports.add("typing", "Literal");
-      builder.push(code`Literal[`);
-      let i = 0;
-      const length = literals.length;
-      for (const val of literals) {
-        builder.push(val.value);
-        if (++i < length) builder.push(code`, `);
-      }
-      builder.push(code`]`);
-    }
-    if (hasNonLiterals) {
-      let i = 0;
-      const length = nonLiterals.length;
-      if (hasLiterals) {
-        builder.push(code`, `);
-      }
-      for (const val of nonLiterals) {
-        builder.push(val.value);
-        if (++i < length) builder.push(code`, `);
-      }
-      builder.push(code`]`);
-    }
-    return builder.reduce();
   }
 }
