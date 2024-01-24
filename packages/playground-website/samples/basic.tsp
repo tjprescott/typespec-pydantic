@@ -1,5 +1,7 @@
 import "typespec-pydantic";
+import "@typespec/http";
 
+using TypeSpec.Http;
 using Pydantic;
 
 @service({
@@ -128,3 +130,14 @@ model Manufacturer {
   @doc("The manufacturer's full address.")
   address: string;
 }
+
+@error
+model Error {
+  id: string;
+  msg?: string;
+}
+
+// Operations ////////////////////
+
+@get
+op getWidget(name: string): Widget | Error;

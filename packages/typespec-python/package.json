@@ -1,8 +1,8 @@
 {
-  "name": "typespec-pydantic",
+  "name": "typespec-python",
   "version": "1.0.0-beta.1",
   "author": "Microsoft Corporation",
-  "description": "Pydantic emitter for TypeSpec",
+  "description": "Python library for TypeSpec",
   "homepage": "https://github.com/tjprescott/typespec-pydantic",
   "readme": "https://github.com/tjprescott/typespec-pydantic/blob/master/README.md",
   "license": "MIT",
@@ -40,9 +40,6 @@
     "check-format": "npm run -s prettier -- --check",
     "cspell": "cspell \"**/*.md\" \"**/*.ts\" \"**/*.tsp\"",
     "test": "mocha"
-  },
-  "dependencies": {
-    "typespec-python": "workspace:~1.0.0-beta.1"
   },
   "peerDependencies": {
     "@typespec/compiler": "^0.51.0"

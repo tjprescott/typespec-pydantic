@@ -1,8 +1,8 @@
 {
-  "name": "typespec-pydantic",
+  "name": "typespec-python-server",
   "version": "1.0.0-beta.1",
   "author": "Microsoft Corporation",
-  "description": "Pydantic emitter for TypeSpec",
+  "description": "Python webapp server emitter for TypeSpec",
   "homepage": "https://github.com/tjprescott/typespec-pydantic",
   "readme": "https://github.com/tjprescott/typespec-pydantic/blob/master/README.md",
   "license": "MIT",
@@ -32,7 +32,6 @@
   "tspMain": "lib/main.tsp",
   "scripts": {
     "clean": "rimraf ./dist ./temp",
-    "purge": "npm run clean && rimraf ./node_modules",
     "build": "tsc -p .",
     "watch": "tsc -p . --watch",
     "lint": "eslint . --ext .ts --max-warnings=0",
@@ -42,10 +41,14 @@
     "test": "mocha"
   },
   "dependencies": {
+    "typespec-flask": "workspace:~1.0.0-beta.1",
+    "typespec-pydantic": "workspace:~1.0.0-beta.1",
     "typespec-python": "workspace:~1.0.0-beta.1"
   },
   "peerDependencies": {
-    "@typespec/compiler": "^0.51.0"
+    "@typespec/compiler": "^0.51.0",
+    "@typespec/http": "^0.51.0",
+    "@typespec/rest": "^0.51.0"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",
