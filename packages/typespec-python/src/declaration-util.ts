@@ -51,7 +51,7 @@ export class DeclarationManager {
   }
 
   defer(path: string, options: DeferredDeclarationOptions) {
-    this.declarations.set(`${path}.${options.name}`, {
+    this.declarations.set(`${path}`, {
       name: options.name,
       kind: options.kind,
       path: path,

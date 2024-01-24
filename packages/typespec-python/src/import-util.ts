@@ -34,6 +34,8 @@ export class ImportManager {
   }
 
   add(module: string, name: string, kind: ImportKind = ImportKind.regular, sourceFile?: SourceFile<string>) {
+    // strip double quotes from the name, if present
+    name = name.replace(/^"(.*)"$/, "$1");
     if (sourceFile === undefined) {
       const context = this.emitter.getContext();
       if (context.scope.kind === "sourceFile") {

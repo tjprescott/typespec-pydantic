@@ -246,8 +246,8 @@ describe("typespec-pydantic: core", () => {
         from pydantic import BaseModel
         from widgets import WidgetString
 
-        class ModelPart(BaseModel):
-            widget: WidgetString
+        class WidgetPart(BaseModel):
+            widget: "WidgetString"
         `;
       const [results, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
