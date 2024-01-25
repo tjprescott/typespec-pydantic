@@ -9,7 +9,7 @@ import {
   StringBuilder,
   code,
 } from "@typespec/compiler/emitter-framework";
-import { getOperationParameters, getRoutePath } from "@typespec/http";
+import { getHttpOperation, getOperationParameters, getRoutePath } from "@typespec/http";
 import { FlaskEmitterOptions } from "./lib.js";
 
 export async function $onEmit(context: EmitContext<FlaskEmitterOptions>) {
@@ -80,9 +80,16 @@ export class FlaskEmitter extends PythonPartialOperationEmitter {
   }
 
   #emitRoute(builder: StringBuilder, operation: Operation) {
-    let path = getRoutePath(this.emitter.getProgram(), operation)?.path ?? "/";
+    // FIXME: include the HTTP methods and append the interface route...
+    const httpOperation = getHttpOperation(this.emitter.getProgram(), operation);
+    let path = httpOperation[0].path;
+    const verb = httpOperation[0].verb;
     path = path.replace(/{/g, "<").replace(/}/g, ">");
-    builder.push(`@app.route("${path}")\n`);
+    builder.push(`@app.route("${path}"`);
+    if (verb) {
+      builder.push(`, methods=["${verb.toUpperCase()}"]`);
+    }
+    builder.push(`)\n`);
   }
 
   operationDeclaration(operation: Operation, name: string): EmitterOutput<string> {

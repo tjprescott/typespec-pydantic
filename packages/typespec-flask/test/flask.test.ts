@@ -9,7 +9,7 @@ describe("typespec-flask: core", () => {
       const expect = `
         app = Flask(__name__)
 
-        @app.route("/")
+        @app.route("/", methods=["POST"])
         def my_foo(name: str, age: int) -> bool:
             pass`;
       const [result, diagnostics] = await flaskOutputFor(input);
@@ -23,7 +23,7 @@ describe("typespec-flask: core", () => {
       const expect = `
         app = Flask(__name__)
 
-        @app.route("/")
+        @app.route("/", methods=["POST"])
         def my_foo(name: str) -> None:
             pass`;
       const [result, diagnostics] = await flaskOutputFor(input);
@@ -45,7 +45,7 @@ describe("typespec-flask: core", () => {
       const expect = `
         app = Flask(__name__)
 
-        @app.route("/")
+        @app.route("/", methods=["POST"])
         def my_foo(a: A) -> B:
             pass`;
       const [result, diagnostics] = await flaskOutputFor(input);
@@ -67,7 +67,7 @@ describe("typespec-flask: core", () => {
       const expect = `
         app = Flask(__name__)
 
-        @app.route("/")
+        @app.route("/", methods=["POST"])
         def my_foo(body: Union[A, B]) -> Union[A, B]:
             pass`;
       const [result, diagnostics] = await flaskOutputFor(input);
@@ -89,7 +89,7 @@ describe("typespec-flask: core", () => {
       const expect = `
         app = Flask(__name__)
 
-        @app.route("/")
+        @app.route("/", methods=["POST"])
         def my_foo(body: Tuple[A, B]) -> Tuple[A, B]:
             pass`;
       const [result, diagnostics] = await flaskOutputFor(input);
@@ -111,7 +111,7 @@ describe("typespec-flask: core", () => {
       const expect = `
         app = Flask(__name__)
 
-        @app.route("/")
+        @app.route("/", methods=["POST"])
         def my_foo(body: List[A]) -> List[B]:
             pass`;
       const [result, diagnostics] = await flaskOutputFor(input);
@@ -156,11 +156,11 @@ describe("typespec-flask: core", () => {
             pass
           
         @app.route("/widgets", methods=["POST"])
-        def widgets_create(name: string) -> Union[Widget, Error]:
+        def widgets_create(name: str) -> Union[Widget, Error]:
             pass
         
         @app.route("/widgets", methods=["PATCH"])
-        def widgets_update(name: string) -> Union[Widget, Error]:
+        def widgets_update(name: str) -> Union[Widget, Error]:
             pass
 
         @app.route("/widgets/<id>", methods=["DELETE"])
