@@ -33,7 +33,7 @@ export class FlaskEmitter extends PythonPartialOperationEmitter {
 
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
     this.imports.add("flask", "Flask", ImportKind.regular, sourceFile);
-    sourceFile.meta["preamble"] = code`app = Flask(__name__)`;
+    sourceFile.meta["preamble"] = code`\napp = Flask(__name__)\n`;
     return super.sourceFile(sourceFile);
   }
 

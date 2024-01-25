@@ -299,6 +299,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   /** Emits an __init__.py file with the relevant import statements. */
   async emitInitFile(initFile: SourceFile<string>, modelFile: SourceFile<string>): Promise<EmittedSourceFile> {
     const initSf = await this.emitter.emitSourceFile(initFile);
+    // FIXME: Get declarations from declarations manager not globalScope.declarations
     const models = modelFile.globalScope.declarations.map((decl) => decl.name);
     const builder = new StringBuilder();
     if (models.length > 0) {
@@ -520,6 +521,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   }
 
   /** Filters out declarations that should not actually be emitted. */
+  // FIXME: Move this logic up into DeclarationManager
   #filterOmittedDeclarations(declarations: Declaration<string>[]): Declaration<string>[] {
     const filtered = declarations.filter((decl) => decl.meta["omit"] === false);
     return filtered;
@@ -530,6 +532,9 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
 
     const sortedFiles = this.#matchSourceFiles(sourceFiles);
     for (const [mainFile, initFile] of sortedFiles) {
+      // eliminate duplicate declarations
+      mainFile.globalScope.declarations = [...new Set([...mainFile.globalScope.declarations])];
+
       const mainSf = await this.emitter.emitSourceFile(mainFile);
       if (this.#filterOmittedDeclarations(mainFile.globalScope.declarations).length === 0) {
         continue;
@@ -556,7 +561,8 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     const builder = new StringBuilder();
 
     // render imports
-    for (const [moduleName, names] of this.imports.getImports(sourceFile, ImportKind.regular)) {
+    const fileImports = this.imports.getImports(sourceFile, ImportKind.regular);
+    for (const [moduleName, names] of fileImports) {
       builder.push(code`from ${moduleName} import ${[...names].join(", ")}\n`);
     }
 
@@ -579,15 +585,11 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
       emittedSourceFile.contents += decl.value + "\n";
     }
 
-    const sfNs = this.buildNamespaceFromPath(sourceFile.path) ?? "";
-
     // render deferred declarations
-    const deferredDeclarations = this.declarations!.filter((decl) => decl.isDeferred && decl.omit === false);
+    const deferredDeclarations = this.declarations!.getDeferredDeclarations(
+      this.buildNamespaceFromPath(sourceFile.path),
+    );
     for (const item of deferredDeclarations) {
-      // only render deferred declarations that are in relevant to the source file
-      const itemNs = item.path.split(".").slice(0, -1).join(".");
-      if (itemNs !== sfNs) continue;
-
       if (item.source?.kind === "Model") {
         const props = this.emitter.emitModelProperties(item.source);
         const modelCode = code`class ${item.name}(BaseModel):\n${props}`;
