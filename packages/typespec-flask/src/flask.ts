@@ -1,5 +1,5 @@
 import { DeclarationKind, DeclarationManager, ImportKind, PythonPartialOperationEmitter } from "typespec-python";
-import { EmitContext, Interface, Model, Operation, Scalar, Type, getNamespaceFullName } from "@typespec/compiler";
+import { EmitContext, Model, Operation, Scalar, Type, getNamespaceFullName } from "@typespec/compiler";
 import {
   AssetEmitter,
   EmittedSourceFile,
@@ -132,13 +132,8 @@ export class FlaskEmitter extends PythonPartialOperationEmitter {
     return value;
   }
 
-  interfaceDeclaration(iface: Interface, name: string): EmitterOutput<string> {
-    // Operation interfaces not supported
-    return this.emitter.result.none();
-  }
-
   interfaceOperationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
-    // Operation interfaces not supported
-    return this.emitter.result.none();
+    const opName = `${operation.interface!.name}_${name}`;
+    return this.operationDeclaration(operation, opName);
   }
 }

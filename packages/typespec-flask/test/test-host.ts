@@ -2,10 +2,11 @@ import { createTestHost, createTestWrapper, resolveVirtualPath } from "@typespec
 import { FlaskTestLibrary } from "../src/testing/index.js";
 import { strictEqual } from "assert";
 import { Diagnostic } from "@typespec/compiler";
+import { HttpTestLibrary } from "@typespec/http/testing";
 
 export async function createFlaskTestHost() {
   return createTestHost({
-    libraries: [FlaskTestLibrary],
+    libraries: [FlaskTestLibrary, HttpTestLibrary],
   });
 }
 
