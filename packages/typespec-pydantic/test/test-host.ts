@@ -3,7 +3,7 @@ import { PydanticTestLibrary } from "../src/testing/index.js";
 import { strictEqual } from "assert";
 import { Diagnostic } from "@typespec/compiler";
 
-export interface PydanticOutput {
+export interface TestOutput {
   path: string;
   contents: string[];
 }
@@ -36,7 +36,7 @@ async function readFilesInDirRecursively(runner: BasicTestRunner, dir: string): 
   return files;
 }
 
-export async function pydanticOutputFor(code: string): Promise<[PydanticOutput[], readonly Diagnostic[]]> {
+export async function pydanticOutputFor(code: string): Promise<[TestOutput[], readonly Diagnostic[]]> {
   const runner = await createPydanticTestRunner();
   const outPath = resolveVirtualPath("/test.py");
   const [_, diagnostics] = await runner.compileAndDiagnose(code, {
@@ -45,7 +45,7 @@ export async function pydanticOutputFor(code: string): Promise<[PydanticOutput[]
     miscOptions: { "disable-linter": true },
   });
   const emitterOutputDir = runner.program.emitters[0].emitterOutputDir;
-  const results: PydanticOutput[] = [];
+  const results: TestOutput[] = [];
   if (runner.fs.get(outPath) === undefined) {
     const files = await readFilesInDirRecursively(runner, emitterOutputDir);
     for (const path of files) {

@@ -1,5 +1,6 @@
 import { expectDiagnosticEmpty } from "@typespec/compiler/testing";
 import { compare, flaskOutputFor } from "./test-host.js";
+import { strictEqual } from "assert";
 
 describe("typespec-flask: core", () => {
   describe("operations", () => {
@@ -12,9 +13,9 @@ describe("typespec-flask: core", () => {
         @app.route("/", methods=["POST"])
         def my_foo(name: str, age: int) -> bool:
             pass`;
-      const [result, diagnostics] = await flaskOutputFor(input);
+      const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, results[0].contents);
     });
 
     it("supports void return types", async () => {
@@ -26,9 +27,9 @@ describe("typespec-flask: core", () => {
         @app.route("/", methods=["POST"])
         def my_foo(name: str) -> None:
             pass`;
-      const [result, diagnostics] = await flaskOutputFor(input);
+      const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, results[0].contents);
     });
 
     it("supports model references", async () => {
@@ -48,9 +49,9 @@ describe("typespec-flask: core", () => {
         @app.route("/", methods=["POST"])
         def my_foo(a: A) -> B:
             pass`;
-      const [result, diagnostics] = await flaskOutputFor(input);
+      const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, results[0].contents);
     });
 
     it("supports unions references", async () => {
@@ -70,9 +71,9 @@ describe("typespec-flask: core", () => {
         @app.route("/", methods=["POST"])
         def my_foo(body: Union[A, B]) -> Union[A, B]:
             pass`;
-      const [result, diagnostics] = await flaskOutputFor(input);
+      const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, results[0].contents);
     });
 
     it("supports tuple references", async () => {
@@ -92,9 +93,9 @@ describe("typespec-flask: core", () => {
         @app.route("/", methods=["POST"])
         def my_foo(body: Tuple[A, B]) -> Tuple[A, B]:
             pass`;
-      const [result, diagnostics] = await flaskOutputFor(input);
+      const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, results[0].contents);
     });
 
     it("supports array references", async () => {
@@ -114,9 +115,31 @@ describe("typespec-flask: core", () => {
         @app.route("/", methods=["POST"])
         def my_foo(body: List[A]) -> List[B]:
             pass`;
-      const [result, diagnostics] = await flaskOutputFor(input);
+      const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, results[0].contents);
+    });
+
+    it("supports namespaces", async () => {
+      const input = `
+        namespace FooService;
+
+        op myFoo(name: string, age: int16): boolean;`;
+      const initExpect = `
+        from .operations import my_foo
+
+        __all__ = ["my_foo"]`;
+      const opExpect = `
+        app = Flask(__name__)
+
+        @app.route("/", methods=["POST"])
+        def my_foo(name: str, age: int) -> bool:
+            pass`;
+      const [results, diagnostics] = await flaskOutputFor(input);
+      expectDiagnosticEmpty(diagnostics);
+      strictEqual(results.length, 2);
+      compare(initExpect, results[0].contents);
+      compare(opExpect, results[1].contents);
     });
   });
 
@@ -170,9 +193,9 @@ describe("typespec-flask: core", () => {
         @app.route("/widgets/<id>/analyze", methods=["POST"])
         def widgets_analyze(id: str) -> Union[str, Error]:
             pass`;
-      const [result, diagnostics] = await flaskOutputFor(input);
+      const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result);
+      compare(expect, results[0].contents);
     });
   });
 });
