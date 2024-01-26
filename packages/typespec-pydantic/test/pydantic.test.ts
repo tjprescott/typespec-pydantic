@@ -1,6 +1,7 @@
 import { expectDiagnosticEmpty } from "@typespec/compiler/testing";
-import { checkImports, compare, pydanticOutputFor } from "./test-host.js";
+import { pydanticOutputFor } from "./test-host.js";
 import { strictEqual } from "assert";
+import { checkImports, compare } from "typespec-python/testing";
 
 describe("typespec-pydantic: core", () => {
   describe("namespaces", () => {
