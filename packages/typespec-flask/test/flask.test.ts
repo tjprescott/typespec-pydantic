@@ -121,7 +121,7 @@ describe("typespec-flask: core", () => {
       compare(expect, results[0].contents);
     });
 
-    it.skip("supports namespaces", async () => {
+    it("supports namespaces", async () => {
       const input = `
         namespace FooService;
 
