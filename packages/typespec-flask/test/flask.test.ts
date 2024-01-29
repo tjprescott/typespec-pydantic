@@ -13,7 +13,7 @@ describe("typespec-flask: core", () => {
 
         @app.route("/", methods=["POST"])
         def my_foo(name: str, age: int) -> bool:
-            pass`;
+            return _my_foo(name, age)`;
       const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, results[0].contents);
@@ -27,7 +27,7 @@ describe("typespec-flask: core", () => {
 
         @app.route("/", methods=["POST"])
         def my_foo(name: str) -> None:
-            pass`;
+            return _my_foo(name)`;
       const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, results[0].contents);
@@ -49,7 +49,7 @@ describe("typespec-flask: core", () => {
 
         @app.route("/", methods=["POST"])
         def my_foo(a: A) -> B:
-            pass`;
+            return _my_foo(a)`;
       const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, results[0].contents);
@@ -71,7 +71,7 @@ describe("typespec-flask: core", () => {
 
         @app.route("/", methods=["POST"])
         def my_foo(body: Union[A, B]) -> Union[A, B]:
-            pass`;
+            return _my_foo(body)`;
       const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, results[0].contents);
@@ -93,7 +93,7 @@ describe("typespec-flask: core", () => {
 
         @app.route("/", methods=["POST"])
         def my_foo(body: Tuple[A, B]) -> Tuple[A, B]:
-            pass`;
+            return _my_foo(body)`;
       const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, results[0].contents);
@@ -115,7 +115,7 @@ describe("typespec-flask: core", () => {
 
         @app.route("/", methods=["POST"])
         def my_foo(body: List[A]) -> List[B]:
-            pass`;
+            return _my_foo(body)`;
       const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, results[0].contents);
@@ -135,7 +135,7 @@ describe("typespec-flask: core", () => {
 
         @app.route("/", methods=["POST"])
         def my_foo(name: str, age: int) -> bool:
-            pass`;
+            return _my_foo(name, age)`;
       const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       strictEqual(results.length, 2);
@@ -173,27 +173,27 @@ describe("typespec-flask: core", () => {
 
         @app.route("/widgets", methods=["GET"])
         def widgets_list() -> Union[List[Widget], Error]:
-            pass
+            return _widgets_list()
         
         @app.route("/widgets/<id>", methods=["GET"])
         def widgets_read(id: str) -> Union[Widget, Error]:
-            pass
+            return _widgets_read(id)
           
         @app.route("/widgets", methods=["POST"])
         def widgets_create(name: str) -> Union[Widget, Error]:
-            pass
+            return _widgets_create(name)
         
         @app.route("/widgets", methods=["PATCH"])
         def widgets_update(name: str) -> Union[Widget, Error]:
-            pass
+            return _widgets_update(name)
 
         @app.route("/widgets/<id>", methods=["DELETE"])
         def widgets_delete(id: str) -> Union[None, Error]:
-            pass
+            return _widgets_delete(id)
         
         @app.route("/widgets/<id>/analyze", methods=["POST"])
         def widgets_analyze(id: str) -> Union[str, Error]:
-            pass`;
+            return _widgets_analyze(id)`;
       const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, results[0].contents);

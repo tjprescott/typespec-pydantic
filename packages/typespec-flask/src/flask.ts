@@ -122,7 +122,8 @@ export class FlaskEmitter extends PythonPartialOperationEmitter {
       }
     }
     builder.push(":\n");
-    builder.push(`${this.indent(1)}pass\n`);
+    // FIXME: should emit an implementation that references a private copy of the operation
+    builder.push(`${this.indent(1)}return _${pythonName}()\n`);
     return this.declarations!.declare(this, {
       name: pythonName,
       kind: DeclarationKind.Operation,
