@@ -68,6 +68,25 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     };
   }
 
+  async buildInitFile(map: Map<string, SourceFile<string>>): Promise<EmittedSourceFile> {
+    const path = map.keys().next().value.split("/").slice(0, -1).join("/");
+    const initFile = this.emitter.createSourceFile(`${path}/__init__.py`);
+    const initSf = await this.emitter.emitSourceFile(initFile);
+    const builder = new StringBuilder();
+    const all = new Set<string>();
+    for (const [path, file] of map) {
+      const fileName = path.split("/").pop()?.split(".")[0];
+      const decls = this.#filterOmittedDeclarations(file.globalScope.declarations);
+      builder.push(`from .${fileName} import ${decls.map((decl) => decl.name).join(", ")}\n`);
+      for (const decl of decls) {
+        all.add(`"${decl.name}"`);
+      }
+    }
+    builder.push(`\n__all__ = [${[...all].join(", ")}]`);
+    initSf.contents = builder.reduce() + "\n";
+    return initSf;
+  }
+
   /** Constructs a file system path for a given namespace. If a fileName is provided,
    * the path will be to a file. Otherwise, the path will be to the folder.
    */
@@ -277,40 +296,6 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     return undefined;
   }
 
-  /** Matches __init__.py and models.py files together */
-  matchSourceFiles(sourceFiles: SourceFile<string>[]): [SourceFile<string>, SourceFile<string>][] {
-    const matchedFiles = new Map<string, SourceFile<string>[]>();
-    for (const sf of sourceFiles) {
-      const path = sf.path;
-      const dir = path.substring(0, path.lastIndexOf("/"));
-      const files = matchedFiles.get(dir) ?? [];
-      // if this is an __init__.py file, add it to the end
-      if (path.endsWith("__init__.py")) {
-        files.push(sf);
-      } else {
-        // otherwise add it to the beginning
-        files.unshift(sf);
-      }
-      matchedFiles.set(dir, files);
-    }
-    return [...matchedFiles.values()].map((files) => [files[0], files[1]]);
-  }
-
-  /** Emits an __init__.py file with the relevant import statements. */
-  async emitInitFile(initFile: SourceFile<string>, modelFile: SourceFile<string>): Promise<EmittedSourceFile> {
-    const initSf = await this.emitter.emitSourceFile(initFile);
-    // FIXME: Get declarations from declarations manager not globalScope.declarations
-    const models = modelFile.globalScope.declarations.map((decl) => decl.name);
-    const builder = new StringBuilder();
-    if (models.length > 0) {
-      builder.push(code`from .models import ${[...models].join(", ")}\n`);
-      const quoted = [...models].map((name) => `"${name}"`);
-      builder.push(code`\n__all__ = [${[...quoted].join(", ")}]\n`);
-    }
-    initSf.contents = builder.reduce() + "\n" + initSf.contents;
-    return initSf;
-  }
-
   /** Construct a fully-qualified namespace string from a model. */
   buildNamespaceFromModel(model: Model | Scalar): string | undefined {
     if (model.namespace === undefined) return undefined;
@@ -501,25 +486,6 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     return code`${value}`;
   }
 
-  /** Matches __init__.py and models.py files together */
-  #matchSourceFiles(sourceFiles: SourceFile<string>[]): [SourceFile<string>, SourceFile<string>][] {
-    const matchedFiles = new Map<string, SourceFile<string>[]>();
-    for (const sf of sourceFiles) {
-      const path = sf.path;
-      const dir = path.substring(0, path.lastIndexOf("/"));
-      const files = matchedFiles.get(dir) ?? [];
-      // if this is an __init__.py file, add it to the end
-      if (path.endsWith("__init__.py")) {
-        files.push(sf);
-      } else {
-        // otherwise add it to the beginning
-        files.unshift(sf);
-      }
-      matchedFiles.set(dir, files);
-    }
-    return [...matchedFiles.values()].map((files) => [files[0], files[1]]);
-  }
-
   /** Filters out declarations that should not actually be emitted. */
   // FIXME: Move this logic up into DeclarationManager
   #filterOmittedDeclarations(declarations: Declaration<string>[]): Declaration<string>[] {
@@ -529,20 +495,15 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
 
   async writeOutput(sourceFiles: SourceFile<string>[]): Promise<void> {
     const toEmit: EmittedSourceFile[] = [];
-
-    const sortedFiles = this.#matchSourceFiles(sourceFiles);
-    for (const [mainFile, initFile] of sortedFiles) {
+    for (const file of sourceFiles) {
       // eliminate duplicate declarations
-      mainFile.globalScope.declarations = [...new Set([...mainFile.globalScope.declarations])];
+      file.globalScope.declarations = [...new Set([...file.globalScope.declarations])];
 
-      const mainSf = await this.emitter.emitSourceFile(mainFile);
-      if (this.#filterOmittedDeclarations(mainFile.globalScope.declarations).length === 0) {
-        continue;
-      }
+      // don't emit empty files
+      if (file.globalScope.declarations.length === 0) continue;
+
+      const mainSf = await this.emitter.emitSourceFile(file);
       toEmit.push(mainSf);
-      if (initFile !== undefined) {
-        toEmit.push(await this.emitInitFile(initFile, mainFile));
-      }
     }
 
     if (!this.emitter.getProgram().compilerOptions.noEmit) {
@@ -616,10 +577,6 @@ export abstract class PythonPartialModelEmitter extends PythonPartialEmitter {
   }
 
   namespaceContext(namespace: Namespace): Context {
-    if (namespace.name === "TypeSpec") {
-      return {};
-    }
-    this.emitter.createSourceFile(this.buildFilePath(namespace, "__init__.py"));
     return this.createNamespaceContext(namespace, this.fileName);
   }
 }

@@ -123,9 +123,9 @@ describe("typespec-flask: core", () => {
 
     it("supports namespaces", async () => {
       const input = `
-        namespace FooService;
-
-        op myFoo(name: string, age: int16): boolean;`;
+        namespace FooService {
+          op myFoo(name: string, age: int16): boolean;
+        }`;
       const initExpect = `
         from .operations import my_foo
 
@@ -139,8 +139,8 @@ describe("typespec-flask: core", () => {
       const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       strictEqual(results.length, 2);
-      compare(initExpect, results[0].contents);
-      compare(opExpect, results[1].contents);
+      compare(opExpect, results[0].contents);
+      compare(initExpect, results[1].contents, false);
     });
   });
 

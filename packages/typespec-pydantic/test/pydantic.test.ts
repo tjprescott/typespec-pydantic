@@ -93,10 +93,10 @@ describe("typespec-pydantic: core", () => {
       expectDiagnosticEmpty(diagnostics);
       strictEqual(results.length, 6);
       compare(aModelExpect, results[0].contents, false);
-      compare(aInitExpect, results[1].contents, false);
-      compare(bModelExpect, results[2].contents, false);
-      compare(bInitExpect, results[3].contents, false);
-      compare(cModelExpect, results[4].contents, false);
+      compare(bModelExpect, results[1].contents, false);
+      compare(cModelExpect, results[2].contents, false);
+      compare(aInitExpect, results[3].contents, false);
+      compare(bInitExpect, results[4].contents, false);
       compare(cInitExpect, results[5].contents, false);
     });
 
@@ -163,10 +163,10 @@ describe("typespec-pydantic: core", () => {
       expectDiagnosticEmpty(diagnostics);
       strictEqual(results.length, 6);
       compare(aModelExpect, results[0].contents, false);
-      compare(aInitExpect, results[1].contents, false);
-      compare(bModelExpect, results[2].contents, false);
-      compare(bInitExpect, results[3].contents, false);
-      compare(cModelExpect, results[4].contents, false);
+      compare(bModelExpect, results[1].contents, false);
+      compare(cModelExpect, results[2].contents, false);
+      compare(aInitExpect, results[3].contents, false);
+      compare(bInitExpect, results[4].contents, false);
       compare(cInitExpect, results[5].contents, false);
     });
 
@@ -216,8 +216,8 @@ describe("typespec-pydantic: core", () => {
       expectDiagnosticEmpty(diagnostics);
       strictEqual(results.length, 6);
       compare(aModelExpect, results[0].contents, false);
-      compare(bModelExpect, results[2].contents, false);
-      compare(cModelExpect, results[4].contents, false);
+      compare(bModelExpect, results[1].contents, false);
+      compare(cModelExpect, results[2].contents, false);
     });
 
     it("supports anonymous template instantiations", async () => {
@@ -250,11 +250,22 @@ describe("typespec-pydantic: core", () => {
         class WidgetPart(BaseModel):
             widget: "WidgetString"
         `;
+      const widgetInitExpect = `
+        from .models import IntWidget, WidgetString
+        
+        __all__ = ["IntWidge", "WidgetString"]`;
+      const partsInitExpect = `
+        from .models import WidgetPart
+        
+        __all__ = ["WidgetPart"]`;
       const [results, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       strictEqual(results.length, 4);
       compare(widgetsExpect, results[0].contents, false);
-      compare(partsExpect, results[2].contents, false);
+      compare(partsExpect, results[1].contents, false);
+      // FIXME: Deferred import is not being picked up
+      compare(widgetInitExpect, results[2].contents, false);
+      compare(partsInitExpect, results[3].contents, false);
     });
   });
 

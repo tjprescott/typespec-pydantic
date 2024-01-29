@@ -1,5 +1,5 @@
 import { DeclarationKind, DeclarationManager, ImportKind, PythonPartialOperationEmitter } from "typespec-python";
-import { EmitContext, Model, Operation, Scalar, Type, getNamespaceFullName } from "@typespec/compiler";
+import { EmitContext, Model, Operation, Scalar, Type, emitFile, getNamespaceFullName } from "@typespec/compiler";
 import {
   AssetEmitter,
   EmittedSourceFile,
@@ -9,10 +9,9 @@ import {
   StringBuilder,
   code,
 } from "@typespec/compiler/emitter-framework";
-import { getHttpOperation, getOperationParameters, getRoutePath } from "@typespec/http";
-import { FlaskEmitterOptions } from "./lib.js";
+import { getHttpOperation, getOperationParameters } from "@typespec/http";
 
-export async function $onEmit(context: EmitContext<FlaskEmitterOptions>) {
+export async function $onEmit(context: EmitContext<Record<string, never>>) {
   const assetEmitter = context.getAssetEmitter(
     class extends FlaskEmitter {
       constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
@@ -21,8 +20,20 @@ export async function $onEmit(context: EmitContext<FlaskEmitterOptions>) {
       }
     },
   );
+  const operationEmitter = new FlaskEmitter(assetEmitter);
   assetEmitter.emitProgram({ emitTypeSpecNamespace: false });
   await assetEmitter.writeOutput();
+  if (!assetEmitter.getProgram().compilerOptions.noEmit) {
+    for (const sourceFile of assetEmitter.getSourceFiles()) {
+      if (sourceFile.globalScope.declarations.length > 0) {
+        const initFile = await operationEmitter.buildInitFile(new Map([[sourceFile.path, sourceFile]]));
+        await emitFile(assetEmitter.getProgram(), {
+          path: initFile.path,
+          content: initFile.contents,
+        });
+      }
+    }
+  }
 }
 
 export class FlaskEmitter extends PythonPartialOperationEmitter {
@@ -93,10 +104,11 @@ export class FlaskEmitter extends PythonPartialOperationEmitter {
   }
 
   operationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
+    const pythonName = this.transformReservedName(this.toSnakeCase(name));
     const builder = new StringBuilder();
     this.emitDocs(builder, operation);
     this.#emitRoute(builder, operation);
-    builder.push(`def ${this.transformReservedName(this.toSnakeCase(name))}(`);
+    builder.push(`def ${pythonName}(`);
     const params = getOperationParameters(this.emitter.getProgram(), operation);
     if (params.length > 0) {
       builder.push(code`${this.operationParameters(operation, operation.parameters)}`);
@@ -111,7 +123,7 @@ export class FlaskEmitter extends PythonPartialOperationEmitter {
     builder.push(":\n");
     builder.push(`${this.indent(1)}pass\n`);
     return this.declarations!.declare(this, {
-      name: name,
+      name: pythonName,
       kind: DeclarationKind.Operation,
       value: builder.reduce(),
       omit: false,
