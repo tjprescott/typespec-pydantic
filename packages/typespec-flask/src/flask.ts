@@ -12,15 +12,16 @@ import {
 import { getHttpOperation, getOperationParameters } from "@typespec/http";
 
 export async function $onEmit(context: EmitContext<Record<string, never>>) {
+  const defaultDeclarationManager = new DeclarationManager();
   const assetEmitter = context.getAssetEmitter(
     class extends FlaskEmitter {
       constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
         super(emitter);
-        this.declarations = new DeclarationManager();
+        this.declarations = declarations ?? defaultDeclarationManager;
       }
     },
   );
-  const operationEmitter = new FlaskEmitter(assetEmitter);
+  const operationEmitter = new FlaskEmitter(assetEmitter, defaultDeclarationManager);
   assetEmitter.emitProgram({ emitTypeSpecNamespace: false });
   await assetEmitter.writeOutput();
   if (!assetEmitter.getProgram().compilerOptions.noEmit) {

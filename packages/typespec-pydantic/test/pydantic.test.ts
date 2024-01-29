@@ -253,7 +253,7 @@ describe("typespec-pydantic: core", () => {
       const widgetInitExpect = `
         from .models import IntWidget, WidgetString
         
-        __all__ = ["IntWidge", "WidgetString"]`;
+        __all__ = ["IntWidget", "WidgetString"]`;
       const partsInitExpect = `
         from .models import WidgetPart
         

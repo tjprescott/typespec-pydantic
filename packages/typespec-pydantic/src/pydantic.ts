@@ -38,15 +38,16 @@ import {
 import { getFields } from "./decorators.js";
 
 export async function $onEmit(context: EmitContext<Record<string, never>>) {
+  const defaultDeclarationManager = new DeclarationManager();
   const assetEmitter = context.getAssetEmitter(
     class extends PydanticEmitter {
       constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
         super(emitter);
-        this.declarations = new DeclarationManager();
+        this.declarations = declarations ?? defaultDeclarationManager;
       }
     },
   );
-  const modelEmitter = new PydanticEmitter(assetEmitter);
+  const modelEmitter = new PydanticEmitter(assetEmitter, defaultDeclarationManager);
   assetEmitter.emitProgram({ emitTypeSpecNamespace: false });
   await assetEmitter.writeOutput();
   if (!assetEmitter.getProgram().compilerOptions.noEmit) {

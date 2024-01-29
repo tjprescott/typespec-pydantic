@@ -76,10 +76,16 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     const all = new Set<string>();
     for (const [path, file] of map) {
       const fileName = path.split("/").pop()?.split(".")[0];
-      const decls = this.#filterOmittedDeclarations(file.globalScope.declarations);
-      builder.push(`from .${fileName} import ${decls.map((decl) => decl.name).join(", ")}\n`);
+      const decls = this.#filterOmittedDeclarations(file.globalScope.declarations).map((decl) => decl.name);
+      const deferredDecls = this.declarations?.getDeferredDeclarations(this.buildNamespaceFromPath(path));
+      if (deferredDecls !== undefined) {
+        for (const deferredDecl of deferredDecls) {
+          decls.push(deferredDecl.name);
+        }
+      }
+      builder.push(`from .${fileName} import ${decls.join(", ")}\n`);
       for (const decl of decls) {
-        all.add(`"${decl.name}"`);
+        all.add(`"${decl}"`);
       }
     }
     builder.push(`\n__all__ = [${[...all].join(", ")}]`);
