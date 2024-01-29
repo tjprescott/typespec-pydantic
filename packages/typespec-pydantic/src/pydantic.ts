@@ -10,6 +10,7 @@ import {
   Scalar,
   Type,
   Union,
+  emitFile,
   getDoc,
   getKnownValues,
   getMaxLength,
@@ -34,20 +35,32 @@ import {
   StringBuilder,
   code,
 } from "@typespec/compiler/emitter-framework";
-import { PydanticEmitterOptions } from "./lib.js";
 import { getFields } from "./decorators.js";
 
-export async function $onEmit(context: EmitContext<PydanticEmitterOptions>) {
+export async function $onEmit(context: EmitContext<Record<string, never>>) {
+  const defaultDeclarationManager = new DeclarationManager();
   const assetEmitter = context.getAssetEmitter(
     class extends PydanticEmitter {
       constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
         super(emitter);
-        this.declarations = new DeclarationManager();
+        this.declarations = declarations ?? defaultDeclarationManager;
       }
     },
   );
+  const modelEmitter = new PydanticEmitter(assetEmitter, defaultDeclarationManager);
   assetEmitter.emitProgram({ emitTypeSpecNamespace: false });
   await assetEmitter.writeOutput();
+  if (!assetEmitter.getProgram().compilerOptions.noEmit) {
+    for (const sourceFile of assetEmitter.getSourceFiles()) {
+      if (sourceFile.globalScope.declarations.length > 0) {
+        const initFile = await modelEmitter.buildInitFile(new Map([[sourceFile.path, sourceFile]]));
+        await emitFile(assetEmitter.getProgram(), {
+          path: initFile.path,
+          content: initFile.contents,
+        });
+      }
+    }
+  }
 }
 
 /// Metadata for a Pydantic field.
@@ -244,6 +257,8 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
 
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
     const sfNs = this.buildNamespaceFromPath(sourceFile.path) ?? "";
+
+    // if any deferred declaration is a model, import Pydantic BaseModel
     const deferredDeclarations = this.declarations!.getDeferredDeclarations(sfNs);
     for (const item of deferredDeclarations) {
       if (item.source?.kind === "Model") {
