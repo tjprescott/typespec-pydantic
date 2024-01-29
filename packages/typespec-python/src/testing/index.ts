@@ -55,7 +55,7 @@ export function checkImports(expected: Map<string, string[]>, lines: string[]) {
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed.startsWith("from")) {
-      const match = trimmed.match(/^from\s+(\w+)\s+import\s+(.*)$/);
+      const match = trimmed.match(/^from\s+([._\w]+)\s+import\s+(.*)$/);
       if (match !== null) {
         imports.set(match[1], match[2].split(","));
       }

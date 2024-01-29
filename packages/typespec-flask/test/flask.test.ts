@@ -1,5 +1,5 @@
 import { expectDiagnosticEmpty } from "@typespec/compiler/testing";
-import { compare } from "typespec-python/testing";
+import { checkImports, compare } from "typespec-python/testing";
 import { strictEqual } from "assert";
 import { flaskOutputFor } from "./test-host.js";
 
@@ -17,6 +17,13 @@ describe("typespec-flask: core", () => {
       const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, results[0].contents);
+      checkImports(
+        new Map([
+          ["._operations", ["_my_foo"]],
+          ["flask", ["Flask"]],
+        ]),
+        results[0].contents,
+      );
     });
 
     it("supports void return types", async () => {

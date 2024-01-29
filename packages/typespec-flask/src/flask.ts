@@ -112,7 +112,7 @@ export class FlaskEmitter extends PythonPartialOperationEmitter {
     builder.push(`def ${pythonName}(`);
     const params = getOperationParameters(this.emitter.getProgram(), operation);
     if (params.length > 0) {
-      builder.push(code`${this.operationParameters(operation, operation.parameters)}`);
+      builder.push(code`${this.operationParameters(operation, operation.parameters, { displayTypes: true })}`);
     }
     builder.push(`)`);
     if (operation.returnType !== undefined) {
@@ -122,39 +122,15 @@ export class FlaskEmitter extends PythonPartialOperationEmitter {
       }
     }
     builder.push(":\n");
-    // FIXME: should emit an implementation that references a private copy of the operation
-    builder.push(`${this.indent(1)}return _${pythonName}()\n`);
+    builder.push(
+      `${this.indent(1)}return _${pythonName}(${this.operationParameters(operation, operation.parameters, { displayTypes: false })})\n`,
+    );
+    this.imports.add("._operations", `_${pythonName}`, ImportKind.regular);
     return this.declarations!.declare(this, {
       name: pythonName,
       kind: DeclarationKind.Operation,
       value: builder.reduce(),
       omit: false,
     });
-  }
-
-  operationParameters(operation: Operation, parameters: Model): EmitterOutput<string> {
-    const builder = new StringBuilder();
-    let i = 0;
-    const length = parameters.properties.size;
-    for (const param of parameters.properties.values()) {
-      const paramName = this.transformReservedName(this.toSnakeCase(param.name));
-      const paramType = this.emitter.emitTypeReference(param.type);
-      builder.push(code`${paramName}: ${paramType}`);
-      if (++i < length) builder.push(code`, `);
-    }
-    return builder.reduce();
-  }
-
-  operationReturnType(operation: Operation, returnType: Type): EmitterOutput<string> {
-    const value = code`${this.emitter.emitTypeReference(operation.returnType)}`;
-    if (returnType.kind === "Model") {
-      this.imports.add(".models", returnType.name);
-    }
-    return value;
-  }
-
-  interfaceOperationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
-    const opName = `${operation.interface!.name}_${name}`;
-    return this.operationDeclaration(operation, opName);
   }
 }

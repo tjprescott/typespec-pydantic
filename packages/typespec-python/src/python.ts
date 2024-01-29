@@ -4,6 +4,7 @@ import {
   Model,
   Namespace,
   NumericLiteral,
+  Operation,
   Program,
   Scalar,
   StringLiteral,
@@ -29,12 +30,17 @@ import {
   code,
 } from "@typespec/compiler/emitter-framework";
 import { ImportManager, ImportKind } from "./import-util.js";
-import { DeclarationManager } from "./declaration-util.js";
+import { DeclarationKind, DeclarationManager } from "./declaration-util.js";
 import { reportDiagnostic } from "./lib.js";
 
 interface UnionVariantMetadata {
   type: Type;
   value: string | StringBuilder;
+}
+
+interface OperationParameterOptions {
+  /** operation parameters should display type info */
+  displayTypes?: boolean;
 }
 
 export abstract class PythonPartialEmitter extends CodeTypeEmitter {
@@ -596,5 +602,38 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
 
   namespaceContext(namespace: Namespace): Context {
     return this.createNamespaceContext(namespace, this.fileName);
+  }
+
+  operationParameters(
+    operation: Operation,
+    parameters: Model,
+    options?: OperationParameterOptions,
+  ): EmitterOutput<string> {
+    const builder = new StringBuilder();
+    let i = 0;
+    const length = parameters.properties.size;
+    for (const param of parameters.properties.values()) {
+      const paramName = this.transformReservedName(this.toSnakeCase(param.name));
+      const paramType = this.emitter.emitTypeReference(param.type);
+      builder.push(code`${paramName}`);
+      if (options?.displayTypes ?? true) {
+        builder.push(code`: ${paramType}`);
+      }
+      if (++i < length) builder.push(code`, `);
+    }
+    return builder.reduce();
+  }
+
+  operationReturnType(operation: Operation, returnType: Type): EmitterOutput<string> {
+    const value = code`${this.emitter.emitTypeReference(operation.returnType)}`;
+    if (returnType.kind === "Model") {
+      this.imports.add(".models", returnType.name);
+    }
+    return value;
+  }
+
+  interfaceOperationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
+    const opName = `${operation.interface!.name}_${name}`;
+    return this.operationDeclaration(operation, opName);
   }
 }
