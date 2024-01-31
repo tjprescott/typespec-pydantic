@@ -35,7 +35,7 @@ export class DeclarationManager {
   private declarations = new Map<string, DeclarationMetadata>();
 
   declare(emitter: PythonPartialEmitter, options: DeclarationOptions): Declaration<string> {
-    const decl = emitter.getAssetEmitter().result.declaration(options.name, options.value ?? "");
+    const decl = emitter.declaration(options.name, options.value ?? "");
     const path = emitter.buildNamespaceFromScope(decl.scope);
     decl.meta["omit"] = options.omit;
     this.declarations.set(`${path}.${options.name}`, {

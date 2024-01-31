@@ -23,14 +23,16 @@ import {
   Declaration,
   EmittedSourceFile,
   EmitterOutput,
+  NoEmit,
   Placeholder,
+  RawCode,
   Scope,
   SourceFile,
   StringBuilder,
   code,
 } from "@typespec/compiler/emitter-framework";
 import { ImportManager, ImportKind } from "./import-util.js";
-import { DeclarationKind, DeclarationManager } from "./declaration-util.js";
+import { DeclarationManager } from "./declaration-util.js";
 import { reportDiagnostic } from "./lib.js";
 
 interface UnionVariantMetadata {
@@ -82,7 +84,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     const all = new Set<string>();
     for (const [path, file] of map) {
       const fileName = path.split("/").pop()?.split(".")[0];
-      const decls = this.#filterOmittedDeclarations(file.globalScope.declarations).map((decl) => decl.name);
+      const decls = this.filterOmittedDeclarations(file.globalScope.declarations).map((decl) => decl.name);
       const deferredDecls = this.declarations?.getDeferredDeclarations(this.buildNamespaceFromPath(path));
       if (deferredDecls !== undefined) {
         for (const deferredDecl of deferredDecls) {
@@ -500,7 +502,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
 
   /** Filters out declarations that should not actually be emitted. */
   // FIXME: Move this logic up into DeclarationManager
-  #filterOmittedDeclarations(declarations: Declaration<string>[]): Declaration<string>[] {
+  private filterOmittedDeclarations(declarations: Declaration<string>[]): Declaration<string>[] {
     const filtered = declarations.filter((decl) => decl.meta["omit"] === false);
     return filtered;
   }
@@ -530,6 +532,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
 
   abstract emitScalar(scalar: Scalar, name: string, sourceFile?: SourceFile<string>): string | Placeholder<string>;
 
+  /** Builds the structure of a Python source file but does not write the file to disk. */
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
     const builder = new StringBuilder();
 
@@ -575,9 +578,39 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     return emittedSourceFile;
   }
 
-  /** Returns the asset emitter. */
-  getAssetEmitter(): AssetEmitter<string, Record<string, never>> {
-    return this.emitter;
+  /** Helper method to get the Program instance from the underlying asset emitter. */
+  getProgram(): Program {
+    return this.emitter.getProgram();
+  }
+
+  /** Helper method to call `emitProgram` on the underlying asset emitter. */
+  emitProgram(options?: { emitTypeSpecNamespace?: boolean }): void {
+    return this.emitter.emitProgram(options);
+  }
+
+  /** Helper method to get the SourceFiles from the underlying asset emitter. */
+  getSourceFiles(): SourceFile<string>[] {
+    return this.emitter.getSourceFiles();
+  }
+
+  /** Helper method to call writeOutput on the underlying asset emitter. */
+  writeAllOutput(): Promise<void> {
+    return this.emitter.writeOutput();
+  }
+
+  /** Helper method to call declaration from the underlying asset emitter. */
+  declaration(name: string, value: string | Placeholder<string>): Declaration<string> {
+    return this.emitter.result.declaration(name, value);
+  }
+
+  /** Helper method to call rawCode from the underlying asset emitter. */
+  rawCode(value: string | Placeholder<string>): RawCode<string> {
+    return this.emitter.result.rawCode(value);
+  }
+
+  /** Helper method to call none from the underlying asset emitter. */
+  skip(): NoEmit {
+    return this.emitter.result.none();
   }
 }
 

@@ -1,7 +1,12 @@
 import { EmitContext, Scalar, emitFile } from "@typespec/compiler";
 import { AssetEmitter, Placeholder, SourceFile } from "@typespec/compiler/emitter-framework";
 import { PydanticEmitter } from "typespec-pydantic";
-import { DeclarationManager, PythonPartialEmitter } from "typespec-python";
+import {
+  DeclarationManager,
+  PythonPartialEmitter,
+  PythonPartialModelEmitter,
+  PythonPartialOperationEmitter,
+} from "typespec-python";
 import { FlaskEmitter } from "typespec-flask";
 
 interface FilePair {
@@ -10,23 +15,24 @@ interface FilePair {
 }
 
 export async function $onEmit(context: EmitContext<Record<string, never>>) {
-  const assetEmitter = context.getAssetEmitter(
-    class extends PythonServerEmitter {
-      constructor(emitter: AssetEmitter<string, Record<string, never>>) {
-        super(emitter, context);
-        this.declarations = new DeclarationManager();
-      }
-    },
+  const serverEmitter = new PythonServerEmitter(
+    context.getAssetEmitter(
+      class extends PythonServerEmitter {
+        constructor(emitter: AssetEmitter<string, Record<string, never>>) {
+          super(emitter, context);
+          this.declarations = new DeclarationManager();
+        }
+      },
+    ),
+    context,
   );
-
-  const serverEmitter = new PythonServerEmitter(assetEmitter, context);
   const modelEmitter = serverEmitter.modelEmitter;
   const operationEmitter = serverEmitter.operationEmitter;
   modelEmitter.emitProgram();
   operationEmitter.emitProgram();
-  await modelEmitter.writeOutput();
-  await operationEmitter.writeOutput();
-  if (!assetEmitter.getProgram().compilerOptions.noEmit) {
+  await modelEmitter.writeAllOutput();
+  await operationEmitter.writeAllOutput();
+  if (!serverEmitter.getProgram().compilerOptions.noEmit) {
     const matchedFiles = serverEmitter.matchSourceFiles(
       modelEmitter.getSourceFiles(),
       operationEmitter.getSourceFiles(),
@@ -41,7 +47,7 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
       map.set(model.path, model);
       map.set(operation.path, operation);
       const initFile = await serverEmitter.buildInitFile(map);
-      await emitFile(assetEmitter.getProgram(), {
+      await emitFile(serverEmitter.getProgram(), {
         path: initFile.path,
         content: initFile.contents,
       });
@@ -50,26 +56,30 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
 }
 
 export class PythonServerEmitter extends PythonPartialEmitter {
-  public modelEmitter: AssetEmitter<string, Record<string, never>>;
-  public operationEmitter: AssetEmitter<string, Record<string, never>>;
+  public modelEmitter: PythonPartialModelEmitter;
+  public operationEmitter: PythonPartialOperationEmitter;
 
   constructor(emitter: AssetEmitter<string, Record<string, never>>, context: EmitContext<Record<string, never>>) {
     const declarations = new DeclarationManager();
     super(emitter);
     this.declarations = declarations;
-    this.modelEmitter = context.getAssetEmitter(
-      class extends PydanticEmitter {
-        constructor(emitter: AssetEmitter<string, Record<string, never>>) {
-          super(emitter, declarations);
-        }
-      },
+    this.modelEmitter = new PydanticEmitter(
+      context.getAssetEmitter(
+        class extends PydanticEmitter {
+          constructor(emitter: AssetEmitter<string, Record<string, never>>) {
+            super(emitter, declarations);
+          }
+        },
+      ),
     );
-    this.operationEmitter = context.getAssetEmitter(
-      class extends FlaskEmitter {
-        constructor(emitter: AssetEmitter<string, Record<string, never>>) {
-          super(emitter, declarations);
-        }
-      },
+    this.operationEmitter = new FlaskEmitter(
+      context.getAssetEmitter(
+        class extends FlaskEmitter {
+          constructor(emitter: AssetEmitter<string, Record<string, never>>) {
+            super(emitter, declarations);
+          }
+        },
+      ),
     );
   }
 
