@@ -39,22 +39,24 @@ import { getFields } from "./decorators.js";
 
 export async function $onEmit(context: EmitContext<Record<string, never>>) {
   const defaultDeclarationManager = new DeclarationManager();
-  const assetEmitter = context.getAssetEmitter(
-    class extends PydanticEmitter {
-      constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
-        super(emitter);
-        this.declarations = declarations ?? defaultDeclarationManager;
-      }
-    },
+  const emitter = new PydanticEmitter(
+    context.getAssetEmitter(
+      class extends PydanticEmitter {
+        constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
+          super(emitter);
+          this.declarations = declarations ?? defaultDeclarationManager;
+        }
+      },
+    ),
+    defaultDeclarationManager,
   );
-  const modelEmitter = new PydanticEmitter(assetEmitter, defaultDeclarationManager);
-  assetEmitter.emitProgram({ emitTypeSpecNamespace: false });
-  await assetEmitter.writeOutput();
-  if (!assetEmitter.getProgram().compilerOptions.noEmit) {
-    for (const sourceFile of assetEmitter.getSourceFiles()) {
+  emitter.emitProgram({ emitTypeSpecNamespace: false });
+  await emitter.writeAllOutput();
+  if (!emitter.getProgram().compilerOptions.noEmit) {
+    for (const sourceFile of emitter.getSourceFiles()) {
       if (sourceFile.globalScope.declarations.length > 0) {
-        const initFile = await modelEmitter.buildInitFile(new Map([[sourceFile.path, sourceFile]]));
-        await emitFile(assetEmitter.getProgram(), {
+        const initFile = await emitter.buildInitFile(new Map([[sourceFile.path, sourceFile]]));
+        await emitFile(emitter.getProgram(), {
           path: initFile.path,
           content: initFile.contents,
         });
