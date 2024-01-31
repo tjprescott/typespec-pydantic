@@ -47,11 +47,6 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
 }
 
 export class FlaskEmitter extends PythonPartialOperationEmitter {
-  constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
-    super(emitter);
-    this.declarations = declarations;
-  }
-
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
     this.imports.add("flask", "Flask", ImportKind.regular, sourceFile);
     sourceFile.meta["preamble"] = code`\napp = Flask(__name__)\n`;

@@ -127,11 +127,6 @@ interface PydanticFieldMetadata {
 }
 
 export class PydanticEmitter extends PythonPartialModelEmitter {
-  constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
-    super(emitter);
-    this.declarations = declarations;
-  }
-
   #emitFieldValue(value: string | StringBuilder | number | boolean | Type | string[] | null): string | StringBuilder {
     if (typeof value === "boolean") {
       return value ? "True" : "False";
@@ -511,26 +506,6 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
       });
       return code`"${converted}"`;
     }
-  }
-
-  operationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
-    // Operations not supported
-    return this.emitter.result.none();
-  }
-
-  operationReturnType(operation: Operation, returnType: Type): EmitterOutput<string> {
-    // Operations not supported
-    return this.emitter.result.none();
-  }
-
-  interfaceDeclaration(iface: Interface, name: string): EmitterOutput<string> {
-    // Operation interfaces not supported
-    return this.emitter.result.none();
-  }
-
-  interfaceOperationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
-    // Operation interfaces not supported
-    return this.emitter.result.none();
   }
 
   unionDeclaration(union: Union, name: string): EmitterOutput<string> {

@@ -1,4 +1,5 @@
 import {
+  AssetEmitter,
   Context,
   EmittedSourceFile,
   EmitterOutput,
@@ -8,7 +9,7 @@ import {
 } from "@typespec/compiler/emitter-framework";
 import { PythonPartialEmitter } from "./python.js";
 import { Model, Namespace, Operation, Program, Type } from "@typespec/compiler";
-import { DeclarationKind } from "./declaration-util.js";
+import { DeclarationKind, DeclarationManager } from "./declaration-util.js";
 import { ImportKind } from "./import-util.js";
 import { getOperationParameters } from "@typespec/http";
 
@@ -17,10 +18,31 @@ interface OperationParameterOptions {
   displayTypes?: boolean;
 }
 
+enum OperationEmitMode {
+  Interface,
+  Implementation,
+}
+
 export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter {
   private fileName = "operations.py";
 
+  protected mode: OperationEmitMode = OperationEmitMode.Interface;
+
   abstract emitRoute(builder: StringBuilder, operation: Operation): void;
+
+  constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
+    super(emitter);
+    this.declarations = declarations;
+  }
+
+  /** Helper method to call `emitProgram` on the underlying asset emitter. */
+  emitProgram(options?: { emitTypeSpecNamespace?: boolean }): void {
+    this.mode = OperationEmitMode.Interface;
+    this.emitter.emitProgram(options);
+    this.mode = OperationEmitMode.Implementation;
+    this.emitter.emitProgram(options);
+    return;
+  }
 
   programContext(program: Program): Context {
     return this.createProgramContext(this.fileName);
@@ -30,7 +52,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
     return this.createNamespaceContext(namespace, this.fileName);
   }
 
-  operationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
+  #operationDeclarationInterface(operation: Operation, name: string): EmitterOutput<string> {
     const pythonName = this.transformReservedName(this.toSnakeCase(name));
     const builder = new StringBuilder();
     this.emitDocs(builder, operation);
@@ -58,6 +80,42 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
       value: builder.reduce(),
       omit: false,
     });
+  }
+
+  #operationDeclarationImplementation(operation: Operation, name: string): EmitterOutput<string> {
+    const pythonName = `_${this.transformReservedName(this.toSnakeCase(name))}`;
+    const builder = new StringBuilder();
+    builder.push(`def ${pythonName}(`);
+    const params = getOperationParameters(this.emitter.getProgram(), operation);
+    if (params.length > 0) {
+      builder.push(code`${this.operationParameters(operation, operation.parameters, { displayTypes: true })}`);
+    }
+    builder.push(`)`);
+    if (operation.returnType !== undefined) {
+      const returnType = this.operationReturnType(operation, operation.returnType);
+      if (returnType !== "") {
+        builder.push(code` -> ${returnType}`);
+      }
+    }
+    builder.push(":\n");
+    builder.push(
+      `${this.indent(1)}# TODO: Implement this\n${this.indent(1)}throw NotImplementedError("Implement ${pythonName}")\n`,
+    );
+    return this.declarations!.declare(this, {
+      name: pythonName,
+      kind: DeclarationKind.Operation,
+      value: builder.reduce(),
+      omit: false,
+    });
+  }
+
+  operationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
+    console.log(`operationDeclaration: ${name} MODE: ${OperationEmitMode[this.mode]}`);
+    if (this.mode === OperationEmitMode.Interface) {
+      return this.#operationDeclarationInterface(operation, name);
+    } else {
+      return this.#operationDeclarationImplementation(operation, name);
+    }
   }
 
   operationParameters(
