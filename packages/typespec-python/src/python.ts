@@ -4,7 +4,6 @@ import {
   Model,
   Namespace,
   NumericLiteral,
-  Operation,
   Program,
   Scalar,
   StringLiteral,
@@ -40,11 +39,6 @@ interface UnionVariantMetadata {
   value: string | StringBuilder;
 }
 
-interface OperationParameterOptions {
-  /** operation parameters should display type info */
-  displayTypes?: boolean;
-}
-
 export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   protected currNamespace: string[] = [];
 
@@ -77,7 +71,12 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   }
 
   async buildInitFile(map: Map<string, SourceFile<string>>): Promise<EmittedSourceFile> {
-    const path = map.keys().next().value.split("/").slice(0, -1).join("/");
+    let path = map.keys().next().value.split("/").slice(0, -1).join("/");
+    // createSourceFile prepends emitterOutputDir to the path, so remove it, if present.
+    const emitterOutputDir = this.emitter.getOptions().emitterOutputDir;
+    if (path.startsWith(emitterOutputDir)) {
+      path = path.substring(emitterOutputDir.length + 1);
+    }
     const initFile = this.emitter.createSourceFile(`${path}/__init__.py`);
     const initSf = await this.emitter.emitSourceFile(initFile);
     const builder = new StringBuilder();
@@ -611,62 +610,5 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   /** Helper method to call none from the underlying asset emitter. */
   skip(): NoEmit {
     return this.emitter.result.none();
-  }
-}
-
-export abstract class PythonPartialModelEmitter extends PythonPartialEmitter {
-  private fileName = "models.py";
-
-  programContext(program: Program): Context {
-    return this.createProgramContext(this.fileName);
-  }
-
-  namespaceContext(namespace: Namespace): Context {
-    return this.createNamespaceContext(namespace, this.fileName);
-  }
-}
-
-export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter {
-  private fileName = "operations.py";
-
-  programContext(program: Program): Context {
-    return this.createProgramContext(this.fileName);
-  }
-
-  namespaceContext(namespace: Namespace): Context {
-    return this.createNamespaceContext(namespace, this.fileName);
-  }
-
-  operationParameters(
-    operation: Operation,
-    parameters: Model,
-    options?: OperationParameterOptions,
-  ): EmitterOutput<string> {
-    const builder = new StringBuilder();
-    let i = 0;
-    const length = parameters.properties.size;
-    for (const param of parameters.properties.values()) {
-      const paramName = this.transformReservedName(this.toSnakeCase(param.name));
-      const paramType = this.emitter.emitTypeReference(param.type);
-      builder.push(code`${paramName}`);
-      if (options?.displayTypes ?? true) {
-        builder.push(code`: ${paramType}`);
-      }
-      if (++i < length) builder.push(code`, `);
-    }
-    return builder.reduce();
-  }
-
-  operationReturnType(operation: Operation, returnType: Type): EmitterOutput<string> {
-    const value = code`${this.emitter.emitTypeReference(operation.returnType)}`;
-    if (returnType.kind === "Model") {
-      this.imports.add(".models", returnType.name);
-    }
-    return value;
-  }
-
-  interfaceOperationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
-    const opName = `${operation.interface!.name}_${name}`;
-    return this.operationDeclaration(operation, opName);
   }
 }

@@ -51,6 +51,15 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
         path: initFile.path,
         content: initFile.contents,
       });
+      if (meta.operation !== undefined) {
+        const implFile = await operationEmitter.buildImplementationFile(meta.operation);
+        if (implFile !== undefined) {
+          await emitFile(operationEmitter.getProgram(), {
+            path: implFile.path,
+            content: implFile.contents,
+          });
+        }
+      }
     }
   }
 }

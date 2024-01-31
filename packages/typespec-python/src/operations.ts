@@ -1,0 +1,118 @@
+import {
+  Context,
+  EmittedSourceFile,
+  EmitterOutput,
+  SourceFile,
+  StringBuilder,
+  code,
+} from "@typespec/compiler/emitter-framework";
+import { PythonPartialEmitter } from "./python.js";
+import { Model, Namespace, Operation, Program, Type } from "@typespec/compiler";
+import { DeclarationKind } from "./declaration-util.js";
+import { ImportKind } from "./import-util.js";
+import { getOperationParameters } from "@typespec/http";
+
+interface OperationParameterOptions {
+  /** operation parameters should display type info */
+  displayTypes?: boolean;
+}
+
+export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter {
+  private fileName = "operations.py";
+
+  abstract emitRoute(builder: StringBuilder, operation: Operation): void;
+
+  programContext(program: Program): Context {
+    return this.createProgramContext(this.fileName);
+  }
+
+  namespaceContext(namespace: Namespace): Context {
+    return this.createNamespaceContext(namespace, this.fileName);
+  }
+
+  operationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
+    const pythonName = this.transformReservedName(this.toSnakeCase(name));
+    const builder = new StringBuilder();
+    this.emitDocs(builder, operation);
+    this.emitRoute(builder, operation);
+    builder.push(`def ${pythonName}(`);
+    const params = getOperationParameters(this.emitter.getProgram(), operation);
+    if (params.length > 0) {
+      builder.push(code`${this.operationParameters(operation, operation.parameters, { displayTypes: true })}`);
+    }
+    builder.push(`)`);
+    if (operation.returnType !== undefined) {
+      const returnType = this.operationReturnType(operation, operation.returnType);
+      if (returnType !== "") {
+        builder.push(code` -> ${returnType}`);
+      }
+    }
+    builder.push(":\n");
+    builder.push(
+      `${this.indent(1)}return _${pythonName}(${this.operationParameters(operation, operation.parameters, { displayTypes: false })})\n`,
+    );
+    this.imports.add("._operations", `_${pythonName}`, ImportKind.regular);
+    return this.declarations!.declare(this, {
+      name: pythonName,
+      kind: DeclarationKind.Operation,
+      value: builder.reduce(),
+      omit: false,
+    });
+  }
+
+  operationParameters(
+    operation: Operation,
+    parameters: Model,
+    options?: OperationParameterOptions,
+  ): EmitterOutput<string> {
+    const builder = new StringBuilder();
+    let i = 0;
+    const length = parameters.properties.size;
+    for (const param of parameters.properties.values()) {
+      const paramName = this.transformReservedName(this.toSnakeCase(param.name));
+      const paramType = this.emitter.emitTypeReference(param.type);
+      builder.push(code`${paramName}`);
+      if (options?.displayTypes ?? true) {
+        builder.push(code`: ${paramType}`);
+      }
+      if (++i < length) builder.push(code`, `);
+    }
+    return builder.reduce();
+  }
+
+  operationReturnType(operation: Operation, returnType: Type): EmitterOutput<string> {
+    const value = code`${this.emitter.emitTypeReference(operation.returnType)}`;
+    if (returnType.kind === "Model") {
+      this.imports.add(".models", returnType.name);
+    }
+    return value;
+  }
+
+  interfaceOperationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
+    const opName = `${operation.interface!.name}_${name}`;
+    return this.operationDeclaration(operation, opName);
+  }
+
+  async buildImplementationFile(sourceFile: SourceFile<string>): Promise<EmittedSourceFile | undefined> {
+    const pathRoot = sourceFile.path.split("/").slice(0, -1).join("/");
+    let path = `${pathRoot}/_operations.py`;
+    // createSourceFile prepends emitterOutputDir to the path, so remove it, if present.
+    const emitterOutputDir = this.emitter.getOptions().emitterOutputDir;
+    if (path.startsWith(emitterOutputDir)) {
+      path = path.substring(emitterOutputDir.length + 1);
+    }
+    try {
+      // check if path already exists. If so, return undefined.
+      await this.emitter.getProgram().host.readFile(path);
+      return undefined;
+    } catch (e) {
+      // file does not exist, so we can create it
+      const implFile = this.emitter.createSourceFile(path);
+      const implSf = await this.emitter.emitSourceFile(implFile);
+      const builder = new StringBuilder();
+      builder.push(`# FIXME: THIS IS IN PROGRESS\n`);
+      implSf.contents = builder.reduce() + "\n";
+      return implSf;
+    }
+  }
+}

@@ -9,7 +9,7 @@ import {
   StringBuilder,
   code,
 } from "@typespec/compiler/emitter-framework";
-import { getHttpOperation, getOperationParameters } from "@typespec/http";
+import { getHttpOperation } from "@typespec/http";
 
 export async function $onEmit(context: EmitContext<Record<string, never>>) {
   const defaultDeclarationManager = new DeclarationManager();
@@ -34,9 +34,9 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
           path: initFile.path,
           content: initFile.contents,
         });
-        const implFile = await operationEmitter.buildImplementationFile(sourceFile);
+        const implFile = await emitter.buildImplementationFile(sourceFile);
         if (implFile !== undefined) {
-          await emitFile(assetEmitter.getProgram(), {
+          await emitFile(emitter.getProgram(), {
             path: implFile.path,
             content: implFile.contents,
           });
@@ -56,24 +56,6 @@ export class FlaskEmitter extends PythonPartialOperationEmitter {
     this.imports.add("flask", "Flask", ImportKind.regular, sourceFile);
     sourceFile.meta["preamble"] = code`\napp = Flask(__name__)\n`;
     return super.sourceFile(sourceFile);
-  }
-
-  async buildImplementationFile(sourceFile: SourceFile<string>): Promise<EmittedSourceFile | undefined> {
-    const pathRoot = sourceFile.path.split("/").slice(0, -1).join("/");
-    const path = `${pathRoot}/_operations.py`;
-    try {
-      // check if path already exists. If so, return undefined.
-      await this.emitter.getProgram().host.readFile(path);
-      return undefined;
-    } catch (e) {
-      // file does not exist, so we can create it
-      const implFile = this.emitter.createSourceFile(path);
-      const implSf = await this.emitter.emitSourceFile(implFile);
-      const builder = new StringBuilder();
-      builder.push("THIS IS A GENERATED FILE!");
-      implSf.contents = builder.reduce() + "\n";
-      return implSf;
-    }
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
@@ -118,7 +100,7 @@ export class FlaskEmitter extends PythonPartialOperationEmitter {
     return this.emitter.result.none();
   }
 
-  #emitRoute(builder: StringBuilder, operation: Operation) {
+  emitRoute(builder: StringBuilder, operation: Operation) {
     // FIXME: include the HTTP methods and append the interface route...
     const httpOperation = getHttpOperation(this.emitter.getProgram(), operation);
     let path = httpOperation[0].path;
@@ -129,35 +111,5 @@ export class FlaskEmitter extends PythonPartialOperationEmitter {
       builder.push(`, methods=["${verb.toUpperCase()}"]`);
     }
     builder.push(`)\n`);
-  }
-
-  operationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
-    const pythonName = this.transformReservedName(this.toSnakeCase(name));
-    const builder = new StringBuilder();
-    this.emitDocs(builder, operation);
-    this.#emitRoute(builder, operation);
-    builder.push(`def ${pythonName}(`);
-    const params = getOperationParameters(this.emitter.getProgram(), operation);
-    if (params.length > 0) {
-      builder.push(code`${this.operationParameters(operation, operation.parameters, { displayTypes: true })}`);
-    }
-    builder.push(`)`);
-    if (operation.returnType !== undefined) {
-      const returnType = this.operationReturnType(operation, operation.returnType);
-      if (returnType !== "") {
-        builder.push(code` -> ${returnType}`);
-      }
-    }
-    builder.push(":\n");
-    builder.push(
-      `${this.indent(1)}return _${pythonName}(${this.operationParameters(operation, operation.parameters, { displayTypes: false })})\n`,
-    );
-    this.imports.add("._operations", `_${pythonName}`, ImportKind.regular);
-    return this.declarations!.declare(this, {
-      name: pythonName,
-      kind: DeclarationKind.Operation,
-      value: builder.reduce(),
-      omit: false,
-    });
   }
 }

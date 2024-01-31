@@ -95,9 +95,9 @@ describe("typespec-pydantic: core", () => {
       compare(aModelExpect, results[0].contents, false);
       compare(bModelExpect, results[1].contents, false);
       compare(cModelExpect, results[2].contents, false);
-      compare(aInitExpect, results[3].contents, false);
+      compare(cInitExpect, results[3].contents, false);
       compare(bInitExpect, results[4].contents, false);
-      compare(cInitExpect, results[5].contents, false);
+      compare(aInitExpect, results[5].contents, false);
     });
 
     it("namespaces as packages: loop", async () => {
@@ -165,9 +165,9 @@ describe("typespec-pydantic: core", () => {
       compare(aModelExpect, results[0].contents, false);
       compare(bModelExpect, results[1].contents, false);
       compare(cModelExpect, results[2].contents, false);
-      compare(aInitExpect, results[3].contents, false);
+      compare(cInitExpect, results[3].contents, false);
       compare(bInitExpect, results[4].contents, false);
-      compare(cInitExpect, results[5].contents, false);
+      compare(aInitExpect, results[5].contents, false);
     });
 
     it("namespaces as packages: lollipop", async () => {
@@ -263,9 +263,8 @@ describe("typespec-pydantic: core", () => {
       strictEqual(results.length, 4);
       compare(widgetsExpect, results[0].contents, false);
       compare(partsExpect, results[1].contents, false);
-      // FIXME: Deferred import is not being picked up
-      compare(widgetInitExpect, results[2].contents, false);
-      compare(partsInitExpect, results[3].contents, false);
+      compare(partsInitExpect, results[2].contents, false);
+      compare(widgetInitExpect, results[3].contents, false);
     });
   });
 

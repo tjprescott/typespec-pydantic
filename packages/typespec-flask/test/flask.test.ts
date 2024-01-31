@@ -1,6 +1,6 @@
 import { expectDiagnosticEmpty } from "@typespec/compiler/testing";
 import { checkImports, compare } from "typespec-python/testing";
-import { strictEqual } from "assert";
+import { strict, strictEqual } from "assert";
 import { flaskOutputFor } from "./test-host.js";
 
 describe("typespec-flask: core", () => {
@@ -145,7 +145,11 @@ describe("typespec-flask: core", () => {
             return _my_foo(name, age)`;
       const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      strictEqual(results.length, 2);
+      // verify files are created at the right paths
+      strictEqual(results.length, 3);
+      strictEqual(results[0].path, "typespec-flask/foo_service/operations.py");
+      strictEqual(results[1].path, "typespec-flask/foo_service/__init__.py");
+      strictEqual(results[2].path, "typespec-flask/foo_service/_operations.py");
       compare(opExpect, results[0].contents);
       compare(initExpect, results[1].contents, false);
     });
