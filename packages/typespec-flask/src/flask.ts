@@ -34,6 +34,13 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
           path: initFile.path,
           content: initFile.contents,
         });
+        const implFile = await operationEmitter.buildImplementationFile(sourceFile);
+        if (implFile !== undefined) {
+          await emitFile(assetEmitter.getProgram(), {
+            path: implFile.path,
+            content: implFile.contents,
+          });
+        }
       }
     }
   }
@@ -49,6 +56,24 @@ export class FlaskEmitter extends PythonPartialOperationEmitter {
     this.imports.add("flask", "Flask", ImportKind.regular, sourceFile);
     sourceFile.meta["preamble"] = code`\napp = Flask(__name__)\n`;
     return super.sourceFile(sourceFile);
+  }
+
+  async buildImplementationFile(sourceFile: SourceFile<string>): Promise<EmittedSourceFile | undefined> {
+    const pathRoot = sourceFile.path.split("/").slice(0, -1).join("/");
+    const path = `${pathRoot}/_operations.py`;
+    try {
+      // check if path already exists. If so, return undefined.
+      await this.emitter.getProgram().host.readFile(path);
+      return undefined;
+    } catch (e) {
+      // file does not exist, so we can create it
+      const implFile = this.emitter.createSourceFile(path);
+      const implSf = await this.emitter.emitSourceFile(implFile);
+      const builder = new StringBuilder();
+      builder.push("THIS IS A GENERATED FILE!");
+      implSf.contents = builder.reduce() + "\n";
+      return implSf;
+    }
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
