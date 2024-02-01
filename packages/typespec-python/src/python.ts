@@ -44,7 +44,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
 
   protected imports: ImportManager;
 
-  protected declarations?: DeclarationManager;
+  public declarations?: DeclarationManager;
 
   constructor(emitter: AssetEmitter<string, Record<string, never>>) {
     super(emitter);

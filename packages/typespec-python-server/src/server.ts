@@ -72,25 +72,11 @@ export class PythonServerEmitter extends PythonPartialEmitter {
   constructor(emitter: AssetEmitter<string, Record<string, never>>, context: EmitContext<Record<string, never>>) {
     const declarations = new DeclarationManager();
     super(emitter);
+    this.modelEmitter = createEmitters(context.program, PydanticEmitter, context)[0] as PydanticEmitter;
+    this.operationEmitter = createEmitters(context.program, FlaskEmitter, context)[0] as FlaskEmitter;
     this.declarations = declarations;
-    this.modelEmitter = createEmitters(
-      context.program,
-      class extends PydanticEmitter {
-        constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
-          super(emitter, declarations);
-        }
-      },
-      context,
-    )[0] as PydanticEmitter;
-    this.operationEmitter = createEmitters(
-      context.program,
-      class extends FlaskEmitter {
-        constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
-          super(emitter, declarations);
-        }
-      },
-      context,
-    )[0] as FlaskEmitter;
+    this.modelEmitter.declarations = declarations;
+    this.operationEmitter.declarations = declarations;
   }
 
   emitScalar(scalar: Scalar, name: string, sourceFile?: SourceFile<string> | undefined): string | Placeholder<string> {

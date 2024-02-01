@@ -17,7 +17,7 @@ describe("typespec-flask: core", () => {
       const expectImpl = `
         def _my_foo(name: str, age: int) -> bool:
             # TODO: Implement this
-            throw NotImplementedError("Implement _my_foo")`;
+            raise NotImplementedError("Implement _my_foo")`;
       const expectInit = `
         from .operations import my_foo
         
@@ -157,7 +157,7 @@ describe("typespec-flask: core", () => {
       const implExpect = `
         def _my_foo(name: str, age: int) -> bool:
             # TODO: Implement this
-            throw NotImplementedError("Implement _my_foo")`;
+            raise NotImplementedError("Implement _my_foo")`;
       const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       // verify files are created at the right paths

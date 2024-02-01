@@ -28,7 +28,6 @@ import {
   getVisibility,
 } from "@typespec/compiler";
 import {
-  AssetEmitter,
   EmitEntity,
   EmittedSourceFile,
   EmitterOutput,
@@ -42,18 +41,8 @@ import {
 import { getFields } from "./decorators.js";
 
 export async function $onEmit(context: EmitContext<Record<string, never>>) {
-  const defaultDeclarationManager = new DeclarationManager();
-  const [typeEmitter, _] = createEmitters(
-    context.program,
-    class extends PydanticEmitter {
-      constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
-        super(emitter);
-        this.declarations = declarations ?? defaultDeclarationManager;
-      }
-    },
-    context,
-  );
-  const emitter = typeEmitter as PydanticEmitter;
+  const emitter = createEmitters(context.program, PydanticEmitter, context)[0] as PydanticEmitter;
+  emitter.declarations = new DeclarationManager();
   emitter.emitProgram({ emitTypeSpecNamespace: false });
   await emitter.writeAllOutput();
   if (!emitter.getProgram().compilerOptions.noEmit) {

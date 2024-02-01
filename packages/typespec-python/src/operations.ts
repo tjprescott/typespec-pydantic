@@ -85,7 +85,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
     }
     builder.push(":\n");
     builder.push(
-      `${this.indent(1)}# TODO: Implement this\n${this.indent(1)}throw NotImplementedError("Implement ${pythonName}")\n`,
+      `${this.indent(1)}# TODO: Implement this\n${this.indent(1)}raise NotImplementedError("Implement ${pythonName}")\n`,
     );
     return `${builder.reduce()}`;
   }

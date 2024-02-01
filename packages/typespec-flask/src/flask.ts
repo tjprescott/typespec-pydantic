@@ -1,7 +1,6 @@
 import { DeclarationKind, DeclarationManager, ImportKind, PythonPartialOperationEmitter } from "typespec-python";
 import { EmitContext, Model, Operation, Scalar, emitFile, getNamespaceFullName } from "@typespec/compiler";
 import {
-  AssetEmitter,
   EmittedSourceFile,
   EmitterOutput,
   Placeholder,
@@ -13,18 +12,8 @@ import { createEmitters } from "typespec-python";
 import { getHttpOperation } from "@typespec/http";
 
 export async function $onEmit(context: EmitContext<Record<string, never>>) {
-  const defaultDeclarationManager = new DeclarationManager();
-  const [typeEmitter, _] = createEmitters(
-    context.program,
-    class extends FlaskEmitter {
-      constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
-        super(emitter);
-        this.declarations = declarations ?? defaultDeclarationManager;
-      }
-    },
-    context,
-  );
-  const emitter = typeEmitter as FlaskEmitter;
+  const emitter = createEmitters(context.program, FlaskEmitter, context)[0] as FlaskEmitter;
+  emitter.declarations = new DeclarationManager();
   emitter.emitProgram({ emitTypeSpecNamespace: false });
   await emitter.writeAllOutput();
   if (!emitter.getProgram().compilerOptions.noEmit) {
