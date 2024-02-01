@@ -9,21 +9,22 @@ import {
   StringBuilder,
   code,
 } from "@typespec/compiler/emitter-framework";
+import { createEmitters } from "typespec-python";
 import { getHttpOperation } from "@typespec/http";
 
 export async function $onEmit(context: EmitContext<Record<string, never>>) {
   const defaultDeclarationManager = new DeclarationManager();
-  const emitter = new FlaskEmitter(
-    context.getAssetEmitter(
-      class extends FlaskEmitter {
-        constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
-          super(emitter);
-          this.declarations = declarations ?? defaultDeclarationManager;
-        }
-      },
-    ),
-    defaultDeclarationManager,
+  const [typeEmitter, _] = createEmitters(
+    context.program,
+    class extends FlaskEmitter {
+      constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
+        super(emitter);
+        this.declarations = declarations ?? defaultDeclarationManager;
+      }
+    },
+    context,
   );
+  const emitter = typeEmitter as FlaskEmitter;
   emitter.emitProgram({ emitTypeSpecNamespace: false });
   await emitter.writeAllOutput();
   if (!emitter.getProgram().compilerOptions.noEmit) {

@@ -18,30 +18,21 @@ interface OperationParameterOptions {
   displayTypes?: boolean;
 }
 
-enum OperationEmitMode {
-  Interface,
-  Implementation,
+interface OperationMetadata {
+  interface: string;
+  implementation: string;
 }
 
 export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter {
   private fileName = "operations.py";
 
-  protected mode: OperationEmitMode = OperationEmitMode.Interface;
+  protected operationMetadata: Map<string, OperationMetadata> = new Map();
 
   abstract emitRoute(builder: StringBuilder, operation: Operation): void;
 
   constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
     super(emitter);
     this.declarations = declarations;
-  }
-
-  /** Helper method to call `emitProgram` on the underlying asset emitter. */
-  emitProgram(options?: { emitTypeSpecNamespace?: boolean }): void {
-    this.mode = OperationEmitMode.Interface;
-    this.emitter.emitProgram(options);
-    this.mode = OperationEmitMode.Implementation;
-    this.emitter.emitProgram(options);
-    return;
   }
 
   programContext(program: Program): Context {
@@ -52,7 +43,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
     return this.createNamespaceContext(namespace, this.fileName);
   }
 
-  #operationDeclarationInterface(operation: Operation, name: string): EmitterOutput<string> {
+  private operationDeclarationInterface(operation: Operation, name: string): string {
     const pythonName = this.transformReservedName(this.toSnakeCase(name));
     const builder = new StringBuilder();
     this.emitDocs(builder, operation);
@@ -74,15 +65,10 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
       `${this.indent(1)}return _${pythonName}(${this.operationParameters(operation, operation.parameters, { displayTypes: false })})\n`,
     );
     this.imports.add("._operations", `_${pythonName}`, ImportKind.regular);
-    return this.declarations!.declare(this, {
-      name: pythonName,
-      kind: DeclarationKind.Operation,
-      value: builder.reduce(),
-      omit: false,
-    });
+    return `${builder.reduce()}`;
   }
 
-  #operationDeclarationImplementation(operation: Operation, name: string): EmitterOutput<string> {
+  private operationDeclarationImplementation(operation: Operation, name: string): string {
     const pythonName = `_${this.transformReservedName(this.toSnakeCase(name))}`;
     const builder = new StringBuilder();
     builder.push(`def ${pythonName}(`);
@@ -101,21 +87,22 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
     builder.push(
       `${this.indent(1)}# TODO: Implement this\n${this.indent(1)}throw NotImplementedError("Implement ${pythonName}")\n`,
     );
-    return this.declarations!.declare(this, {
-      name: pythonName,
-      kind: DeclarationKind.Operation,
-      value: builder.reduce(),
-      omit: false,
-    });
+    return `${builder.reduce()}`;
   }
 
   operationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
-    console.log(`operationDeclaration: ${name} MODE: ${OperationEmitMode[this.mode]}`);
-    if (this.mode === OperationEmitMode.Interface) {
-      return this.#operationDeclarationInterface(operation, name);
-    } else {
-      return this.#operationDeclarationImplementation(operation, name);
-    }
+    const pythonName = this.transformReservedName(this.toSnakeCase(name));
+    const interfaceValue = this.operationDeclarationInterface(operation, name);
+    const implementationValue = this.operationDeclarationImplementation(operation, name);
+    const decl = this.declarations!.declare(this, {
+      name: pythonName,
+      kind: DeclarationKind.Operation,
+      value: interfaceValue,
+      omit: false,
+    });
+    const path = `${this.buildNamespaceFromScope(decl.scope)}.${pythonName}`;
+    this.operationMetadata.set(path, { interface: interfaceValue, implementation: implementationValue });
+    return decl;
   }
 
   operationParameters(
@@ -168,7 +155,9 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
       const implFile = this.emitter.createSourceFile(path);
       const implSf = await this.emitter.emitSourceFile(implFile);
       const builder = new StringBuilder();
-      builder.push(`# FIXME: THIS IS IN PROGRESS\n`);
+      for (const meta of this.operationMetadata.values()) {
+        builder.push(`${meta.implementation}\n`);
+      }
       implSf.contents = builder.reduce() + "\n";
       return implSf;
     }

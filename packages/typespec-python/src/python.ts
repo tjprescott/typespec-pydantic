@@ -77,7 +77,8 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     if (path.startsWith(emitterOutputDir)) {
       path = path.substring(emitterOutputDir.length + 1);
     }
-    const initFile = this.emitter.createSourceFile(`${path}/__init__.py`);
+    const initPath = path !== "" ? `${path}/__init__.py` : "__init__.py";
+    const initFile = this.emitter.createSourceFile(initPath);
     const initSf = await this.emitter.emitSourceFile(initFile);
     const builder = new StringBuilder();
     const all = new Set<string>();
@@ -584,7 +585,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
 
   /** Helper method to call `emitProgram` on the underlying asset emitter. */
   emitProgram(options?: { emitTypeSpecNamespace?: boolean }): void {
-    return this.emitter.emitProgram(options);
+    this.emitter.emitProgram(options);
   }
 
   /** Helper method to get the SourceFiles from the underlying asset emitter. */

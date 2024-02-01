@@ -1,12 +1,16 @@
-import { ImportKind, DeclarationManager, DeclarationKind, PythonPartialModelEmitter } from "typespec-python";
+import {
+  ImportKind,
+  DeclarationManager,
+  DeclarationKind,
+  PythonPartialModelEmitter,
+  createEmitters,
+} from "typespec-python";
 import {
   EmitContext,
   Enum,
   EnumMember,
-  Interface,
   Model,
   ModelProperty,
-  Operation,
   Scalar,
   Type,
   Union,
@@ -39,17 +43,17 @@ import { getFields } from "./decorators.js";
 
 export async function $onEmit(context: EmitContext<Record<string, never>>) {
   const defaultDeclarationManager = new DeclarationManager();
-  const emitter = new PydanticEmitter(
-    context.getAssetEmitter(
-      class extends PydanticEmitter {
-        constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
-          super(emitter);
-          this.declarations = declarations ?? defaultDeclarationManager;
-        }
-      },
-    ),
-    defaultDeclarationManager,
+  const [typeEmitter, _] = createEmitters(
+    context.program,
+    class extends PydanticEmitter {
+      constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
+        super(emitter);
+        this.declarations = declarations ?? defaultDeclarationManager;
+      }
+    },
+    context,
   );
+  const emitter = typeEmitter as PydanticEmitter;
   emitter.emitProgram({ emitTypeSpecNamespace: false });
   await emitter.writeAllOutput();
   if (!emitter.getProgram().compilerOptions.noEmit) {

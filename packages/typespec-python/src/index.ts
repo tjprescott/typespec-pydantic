@@ -5,3 +5,4 @@ export * from "./models.js";
 export * from "./operations.js";
 export * from "./import-util.js";
 export * from "./declaration-util.js";
+export * from "./asset-emitter-util.js";

@@ -6,6 +6,7 @@ import {
   PythonPartialEmitter,
   PythonPartialModelEmitter,
   PythonPartialOperationEmitter,
+  createEmitters,
 } from "typespec-python";
 import { FlaskEmitter } from "typespec-flask";
 
@@ -72,24 +73,24 @@ export class PythonServerEmitter extends PythonPartialEmitter {
     const declarations = new DeclarationManager();
     super(emitter);
     this.declarations = declarations;
-    this.modelEmitter = new PydanticEmitter(
-      context.getAssetEmitter(
-        class extends PydanticEmitter {
-          constructor(emitter: AssetEmitter<string, Record<string, never>>) {
-            super(emitter, declarations);
-          }
-        },
-      ),
-    );
-    this.operationEmitter = new FlaskEmitter(
-      context.getAssetEmitter(
-        class extends FlaskEmitter {
-          constructor(emitter: AssetEmitter<string, Record<string, never>>) {
-            super(emitter, declarations);
-          }
-        },
-      ),
-    );
+    this.modelEmitter = createEmitters(
+      context.program,
+      class extends PydanticEmitter {
+        constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
+          super(emitter, declarations);
+        }
+      },
+      context,
+    )[0] as PydanticEmitter;
+    this.operationEmitter = createEmitters(
+      context.program,
+      class extends FlaskEmitter {
+        constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
+          super(emitter, declarations);
+        }
+      },
+      context,
+    )[0] as FlaskEmitter;
   }
 
   emitScalar(scalar: Scalar, name: string, sourceFile?: SourceFile<string> | undefined): string | Placeholder<string> {

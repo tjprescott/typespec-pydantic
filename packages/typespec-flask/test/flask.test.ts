@@ -1,6 +1,6 @@
 import { expectDiagnosticEmpty } from "@typespec/compiler/testing";
 import { checkImports, compare } from "typespec-python/testing";
-import { strict, strictEqual } from "assert";
+import { strictEqual } from "assert";
 import { flaskOutputFor } from "./test-host.js";
 
 describe("typespec-flask: core", () => {
@@ -8,15 +8,26 @@ describe("typespec-flask: core", () => {
     it("supports simple parameters", async () => {
       const input = `
         op myFoo(name: string, age: int16): boolean;`;
-      const expect = `
+      const expectOp = `
         app = Flask(__name__)
 
         @app.route("/", methods=["POST"])
         def my_foo(name: str, age: int) -> bool:
             return _my_foo(name, age)`;
+      const expectImpl = `
+        def _my_foo(name: str, age: int) -> bool:
+            # TODO: Implement this
+            throw NotImplementedError("Implement _my_foo")`;
+      const expectInit = `
+        from .operations import my_foo
+        
+        __all__ = ["my_foo"]`;
       const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, results[0].contents);
+      // ensure that operations.py, _operations.py, and __init__.py are created as expected
+      compare(expectOp, results[0].contents);
+      compare(expectInit, results[1].contents, false);
+      compare(expectImpl, results[2].contents);
       checkImports(
         new Map([
           ["._operations", ["_my_foo"]],
@@ -143,6 +154,10 @@ describe("typespec-flask: core", () => {
         @app.route("/", methods=["POST"])
         def my_foo(name: str, age: int) -> bool:
             return _my_foo(name, age)`;
+      const implExpect = `
+        def _my_foo(name: str, age: int) -> bool:
+            # TODO: Implement this
+            throw NotImplementedError("Implement _my_foo")`;
       const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       // verify files are created at the right paths
@@ -152,6 +167,7 @@ describe("typespec-flask: core", () => {
       strictEqual(results[2].path, "typespec-flask/foo_service/_operations.py");
       compare(opExpect, results[0].contents);
       compare(initExpect, results[1].contents, false);
+      compare(implExpect, results[2].contents);
     });
   });
 
