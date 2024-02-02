@@ -537,15 +537,17 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     const builder = new StringBuilder();
 
     // render imports
-    const fileImports = this.imports.getImports(sourceFile, ImportKind.regular);
-    for (const [moduleName, names] of fileImports) {
+    const fileImports = this.imports.get(sourceFile, ImportKind.regular);
+    for (const [moduleName, metadata] of fileImports) {
+      const names = Array.from(metadata).map((meta) => meta.name);
       builder.push(code`from ${moduleName} import ${[...names].join(", ")}\n`);
     }
 
-    const deferredImports = this.imports.getImports(sourceFile, ImportKind.deferred);
+    const deferredImports = this.imports.get(sourceFile, ImportKind.deferred);
     if (deferredImports.size > 0) {
       builder.push(code`\nif TYPE_CHECKING:\n`);
-      for (const [moduleName, names] of deferredImports) {
+      for (const [moduleName, metadata] of deferredImports) {
+        const names = Array.from(metadata).map((meta) => meta.name);
         builder.push(code`${this.indent()}from ${moduleName} import ${[...names].join(", ")}\n`);
       }
     }

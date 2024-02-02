@@ -64,7 +64,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
     builder.push(
       `${this.indent(1)}return _${pythonName}(${this.operationParameters(operation, operation.parameters, { displayTypes: false })})\n`,
     );
-    this.imports.add("._operations", `_${pythonName}`, ImportKind.regular);
+    this.imports.add("._operations", `_${pythonName}`);
     return `${builder.reduce()}`;
   }
 
@@ -155,6 +155,13 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
       const implFile = this.emitter.createSourceFile(path);
       const implSf = await this.emitter.emitSourceFile(implFile);
       const builder = new StringBuilder();
+      const opImports = this.imports.get(sourceFile, ImportKind.regular);
+      for (const [module, imports] of opImports) {
+        builder.push(`from ${module} import ${[...imports].join(", ")}\n`);
+      }
+      if (opImports.size > 0) {
+        builder.push("\n");
+      }
       for (const meta of this.operationMetadata.values()) {
         builder.push(`${meta.implementation}\n`);
       }
