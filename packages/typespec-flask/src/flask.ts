@@ -1,5 +1,5 @@
 import { DeclarationKind, DeclarationManager, ImportKind, PythonPartialOperationEmitter } from "typespec-python";
-import { EmitContext, Model, Operation, Scalar, emitFile, getNamespaceFullName } from "@typespec/compiler";
+import { EmitContext, Operation, Scalar, emitFile, getNamespaceFullName } from "@typespec/compiler";
 import {
   EmittedSourceFile,
   EmitterOutput,
@@ -16,21 +16,30 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
   emitter.declarations = new DeclarationManager();
   emitter.emitProgram({ emitTypeSpecNamespace: false });
   await emitter.writeAllOutput();
-  if (!emitter.getProgram().compilerOptions.noEmit) {
-    for (const sourceFile of emitter.getSourceFiles()) {
-      if (sourceFile.globalScope.declarations.length > 0) {
-        const initFile = await emitter.buildInitFile(new Map([[sourceFile.path, sourceFile]]));
+
+  // early exit if compiler is set to not emit
+  if (emitter.getProgram().compilerOptions.noEmit) {
+    return;
+  }
+
+  // now write the init and implementation files
+  const sourceFiles = emitter.getSourceFiles();
+  for (const sourceFile of sourceFiles) {
+    const initFile = await emitter.buildInitFile(new Map([[sourceFile.path, sourceFile]]));
+    if (initFile !== undefined) {
+      await emitFile(emitter.getProgram(), {
+        path: initFile.path,
+        content: initFile.contents,
+      });
+    }
+    const declarations = emitter.declarations!.get({ sourceFile: sourceFile, kind: DeclarationKind.Operation });
+    if (declarations.length > 0) {
+      const implFile = await emitter.buildImplementationFile(sourceFile);
+      if (implFile !== undefined) {
         await emitFile(emitter.getProgram(), {
-          path: initFile.path,
-          content: initFile.contents,
+          path: implFile.path,
+          content: implFile.contents,
         });
-        const implFile = await emitter.buildImplementationFile(sourceFile);
-        if (implFile !== undefined) {
-          await emitFile(emitter.getProgram(), {
-            path: implFile.path,
-            content: implFile.contents,
-          });
-        }
       }
     }
   }
@@ -41,21 +50,6 @@ export class FlaskEmitter extends PythonPartialOperationEmitter {
     this.imports.add("flask", "Flask", ImportKind.regular, sourceFile);
     sourceFile.meta["preamble"] = code`\napp = Flask(__name__)\n`;
     return super.sourceFile(sourceFile);
-  }
-
-  modelDeclaration(model: Model, name: string): EmitterOutput<string> {
-    const namespace = this.buildImportPathForNamespace(model.namespace);
-    const fullPath = namespace === "" ? name : `${namespace}.${name}`;
-    const existing = this.declarations!.getDeclaration(fullPath);
-    if (!existing) {
-      return this.declarations!.declare(this, {
-        name: name,
-        kind: DeclarationKind.Model,
-        value: undefined,
-        omit: true,
-      });
-    }
-    return existing;
   }
 
   emitScalar(scalar: Scalar, name: string, sourceFile?: SourceFile<string>): string | Placeholder<string> {
@@ -96,5 +90,12 @@ export class FlaskEmitter extends PythonPartialOperationEmitter {
       builder.push(`, methods=["${verb.toUpperCase()}"]`);
     }
     builder.push(`)\n`);
+  }
+
+  shouldOmitImport(module: string): boolean {
+    if (module.endsWith("_operations") || module === "flask") {
+      return true;
+    }
+    return false;
   }
 }

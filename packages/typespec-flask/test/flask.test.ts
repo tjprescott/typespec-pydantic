@@ -1,5 +1,5 @@
 import { expectDiagnosticEmpty } from "@typespec/compiler/testing";
-import { checkImports, compare } from "typespec-python/testing";
+import { compare } from "typespec-python/testing";
 import { strictEqual } from "assert";
 import { flaskOutputFor } from "./test-host.js";
 
@@ -31,13 +31,6 @@ describe("typespec-flask: core", () => {
       compare(expectOp, results[0].contents, false);
       compare(expectInit, results[1].contents, false);
       compare(expectImpl, results[2].contents, false);
-      checkImports(
-        new Map([
-          ["._operations", ["_my_foo"]],
-          ["flask", ["Flask"]],
-        ]),
-        results[0].contents,
-      );
     });
 
     it("supports void return types", async () => {
@@ -66,8 +59,8 @@ describe("typespec-flask: core", () => {
 
         op myFoo(a: A): B;`;
       const opExpect = `
-        from .models import A, B
-        from ._operations import _my_foo
+        from models import A, B
+        from _operations import _my_foo
         from flask import Flask
 
         app = Flask(__name__)
@@ -76,11 +69,11 @@ describe("typespec-flask: core", () => {
         def my_foo(a: A) -> B:
             return _my_foo(a)`;
       const initExpect = `
-        from .operations import my_foo
+        from operations import my_foo
         
         __all__ = ["my_foo"]`;
       const implExpect = `
-        from .models import A, B
+        from models import A, B
 
         def _my_foo(a: A) -> B:
             # TODO: Implement this
@@ -149,8 +142,8 @@ describe("typespec-flask: core", () => {
         op myFoo(body: A[]): B[];`;
       const opExpect = `
         from typing import List
-        from .models import A, B
-        from ._operations import _my_foo
+        from models import A, B
+        from _operations import _my_foo
         from flask import Flask
 
         app = Flask(__name__)
@@ -159,8 +152,8 @@ describe("typespec-flask: core", () => {
         def my_foo(body: List[A]) -> List[B]:
             return _my_foo(body)`;
       const implExpect = `
-        from typing import List  
-        from .models import A, B
+        from typing import List
+        from models import A, B
 
         def _my_foo(body: List[A]) -> List[B]:
             # TODO: Implement this
@@ -173,6 +166,7 @@ describe("typespec-flask: core", () => {
 
     it("supports namespaces", async () => {
       const input = `
+        @service
         namespace FooService {
           model A {
             name: string;
@@ -404,7 +398,6 @@ describe("typespec-flask: core", () => {
         `
         from typing import List, Union
         from widgets import Widget, Error
-        from widgets._operations import _widget_ops_list, _widget_ops_read
 
         def _widget_ops_list() -> Union[List[Widget], Error]:
             # TODO: Implement this

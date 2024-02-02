@@ -3,12 +3,13 @@ import {
   Context,
   EmittedSourceFile,
   EmitterOutput,
+  Placeholder,
   SourceFile,
   StringBuilder,
   code,
 } from "@typespec/compiler/emitter-framework";
 import { PythonPartialEmitter } from "./python.js";
-import { Model, Namespace, Operation, Program, Type } from "@typespec/compiler";
+import { Model, Namespace, Operation, Program, Type, emitFile } from "@typespec/compiler";
 import { DeclarationKind, DeclarationManager } from "./declaration-util.js";
 import { ImportKind } from "./import-util.js";
 import { getOperationParameters } from "@typespec/http";
@@ -29,6 +30,11 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
   protected operationMetadata: Map<string, OperationMetadata> = new Map();
 
   abstract emitRoute(builder: StringBuilder, operation: Operation): void;
+
+  /** A method that is called when generating operation implementations.
+   * Allows the emitter to decide whether the implementation needs the provided imports.
+   * Return true to filter out the import or false to include it. */
+  abstract shouldOmitImport(module: string): boolean;
 
   constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
     super(emitter);
@@ -65,7 +71,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
       `${this.indent(1)}return _${pythonName}(${this.operationParameters(operation, operation.parameters, { displayTypes: false })})\n`,
     );
     const namespace = this.buildImportPathForNamespace(operation.namespace);
-    const fullPath = namespace === undefined ? pythonName : `${namespace}._operations`;
+    const fullPath = namespace === undefined ? "_operations" : `${namespace}._operations`;
     this.imports.add(fullPath, `_${pythonName}`);
     return `${builder.reduce()}`;
   }
@@ -92,12 +98,29 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
     return `${builder.reduce()}`;
   }
 
+  modelDeclaration(model: Model, name: string): EmitterOutput<string> {
+    const namespace = this.buildImportPathForNamespace(model.namespace);
+    const fullPath = namespace === undefined ? name : `${namespace}.${name}`;
+    const existing = this.declarations!.get({ path: fullPath })[0];
+    if (!existing) {
+      return this.declarations!.declare(this, {
+        name: name,
+        namespace: model.namespace,
+        kind: DeclarationKind.Model,
+        value: undefined,
+        omit: true,
+      });
+    }
+    return existing.decl ?? this.emitter.result.none();
+  }
+
   operationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
     const pythonName = this.transformReservedName(this.toSnakeCase(name));
     const interfaceValue = this.operationDeclarationInterface(operation, name);
     const implementationValue = this.operationDeclarationImplementation(operation, name);
     const decl = this.declarations!.declare(this, {
       name: pythonName,
+      namespace: operation.namespace,
       kind: DeclarationKind.Operation,
       value: interfaceValue,
       omit: false,
@@ -119,7 +142,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
       const paramName = this.transformReservedName(this.toSnakeCase(param.name));
       const paramType = this.emitter.emitTypeReference(param.type);
       if (param.type.kind === "Model" && param.type.name !== "Array") {
-        this.imports.add(".models", param.type.name);
+        this.imports.add("models", param.type.name);
       }
       builder.push(code`${paramName}`);
       if (options?.displayTypes ?? true) {
@@ -133,7 +156,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
   operationReturnType(operation: Operation, returnType: Type): EmitterOutput<string> {
     const value = code`${this.emitter.emitTypeReference(operation.returnType)}`;
     if (returnType.kind === "Model" && returnType.name !== "Array") {
-      this.imports.add(".models", returnType.name);
+      this.imports.add("models", returnType.name);
     }
     return value;
   }
@@ -168,6 +191,9 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
       const importPath = this.buildImportPathForFilePath(path) ?? "_operations";
       const opImports = this.imports.get(sourceFile, ImportKind.regular);
       for (const [module, metadata] of opImports) {
+        if (this.shouldOmitImport(module)) {
+          continue;
+        }
         const names = Array.from(metadata).map((meta) => meta.name);
         builder.push(`from ${module} import ${[...names].join(", ")}\n`);
       }
@@ -181,6 +207,42 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
       }
       implSf.contents = builder.reduce() + "\n";
       return implSf;
+    }
+  }
+
+  emitTypeReference(type: Type) {
+    const destNs = this.buildImportPathForNamespace((type as Model).namespace);
+    if (destNs !== "type_spec" && type.kind === "Model") {
+      const templateArgs = type.templateMapper?.args;
+      if (templateArgs === undefined || templateArgs.length === 0) {
+        this.imports.add(destNs ?? "models", type.name);
+      }
+    }
+    const value = this.emitter.emitTypeReference(type);
+    if (value.kind === "code" && value.value instanceof Placeholder && (value.value as any).segments === undefined) {
+      return code`"${value}"`;
+    }
+    return code`${value}`;
+  }
+
+  async writeOutput(sourceFiles: SourceFile<string>[]): Promise<void> {
+    const toEmit: EmittedSourceFile[] = [];
+    for (const file of sourceFiles) {
+      // don't emit empty files
+      const decls = this.declarations!.get({ kind: DeclarationKind.Operation, sourceFile: file });
+      if (decls.length === 0) continue;
+
+      const mainSf = await this.emitter.emitSourceFile(file);
+      toEmit.push(mainSf);
+    }
+
+    if (!this.emitter.getProgram().compilerOptions.noEmit) {
+      for (const emittedSf of toEmit) {
+        await emitFile(this.emitter.getProgram(), {
+          path: emittedSf.path,
+          content: emittedSf.contents,
+        });
+      }
     }
   }
 }

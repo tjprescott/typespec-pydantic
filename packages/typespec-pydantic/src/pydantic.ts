@@ -4,6 +4,7 @@ import {
   DeclarationKind,
   PythonPartialModelEmitter,
   createEmitters,
+  DeclarationDeferKind,
 } from "typespec-python";
 import {
   EmitContext,
@@ -49,10 +50,11 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
     for (const sourceFile of emitter.getSourceFiles()) {
       if (sourceFile.globalScope.declarations.length > 0) {
         const initFile = await emitter.buildInitFile(new Map([[sourceFile.path, sourceFile]]));
-        await emitFile(emitter.getProgram(), {
-          path: initFile.path,
-          content: initFile.contents,
-        });
+        if (initFile !== undefined)
+          await emitFile(emitter.getProgram(), {
+            path: initFile.path,
+            content: initFile.contents,
+          });
       }
     }
   }
@@ -249,8 +251,8 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     const sfNs = this.buildNamespaceFromPath(sourceFile.path) ?? "";
 
     // if any deferred declaration is a model, import Pydantic BaseModel
-    const deferredDeclarations = this.declarations!.getDeferredDeclarations(sfNs);
-    for (const item of deferredDeclarations) {
+    const deferredDecls = this.declarations!.get({ path: sfNs, defer: DeclarationDeferKind.Deferred });
+    for (const item of deferredDecls) {
       if (item.source?.kind === "Model") {
         this.imports.add("pydantic", "BaseModel", ImportKind.regular, sourceFile);
         break;
@@ -298,6 +300,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     this.currNamespace.pop();
     return this.declarations!.declare(this, {
       name: name,
+      namespace: model.namespace,
       kind: DeclarationKind.Model,
       value: builder.reduce(),
       omit: false,
@@ -408,6 +411,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     builder.push(code`${members}`);
     return this.declarations!.declare(this, {
       name: name,
+      namespace: en.namespace,
       kind: DeclarationKind.Model,
       value: builder.reduce(),
       omit: false,
@@ -446,6 +450,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     builder.push(code`${this.indent()}def __getitem__(self, item):\n${this.indent(2)}return self.root[item]\n\n`);
     return this.declarations!.declare(this, {
       name: name,
+      namespace: array.namespace,
       kind: DeclarationKind.Model,
       value: builder.reduce(),
       omit: false,
@@ -505,6 +510,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   unionDeclaration(union: Union, name: string): EmitterOutput<string> {
     return this.declarations!.declare(this, {
       name: name,
+      namespace: union.namespace,
       kind: DeclarationKind.Model,
       value: undefined,
       omit: true,
