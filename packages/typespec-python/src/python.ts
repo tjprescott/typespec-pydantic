@@ -83,7 +83,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     const builder = new StringBuilder();
     const all = new Set<string>();
     for (const [path, file] of map) {
-      const fileName = path.split("/").pop()?.split(".")[0];
+      const importPath = this.buildImportPathForFilePath(path);
       const decls = this.filterOmittedDeclarations(file.globalScope.declarations).map((decl) => decl.name);
       const deferredDecls = this.declarations?.getDeferredDeclarations(this.buildNamespaceFromPath(path));
       if (deferredDecls !== undefined) {
@@ -91,7 +91,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
           decls.push(deferredDecl.name);
         }
       }
-      builder.push(`from .${fileName} import ${decls.join(", ")}\n`);
+      builder.push(`from ${importPath} import ${decls.join(", ")}\n`);
       for (const decl of decls) {
         all.add(`"${decl}"`);
       }
@@ -310,14 +310,29 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     return undefined;
   }
 
-  /** Construct a fully-qualified namespace string from a model. */
-  buildNamespaceFromModel(model: Model | Scalar): string | undefined {
-    if (model.namespace === undefined) return undefined;
-    const fullNsName = getNamespaceFullName(model.namespace);
+  /** Construct a fully-qualified import path string from a namespace */
+  buildImportPathForNamespace(namespace: Namespace | undefined): string | undefined {
+    if (namespace === undefined) return undefined;
+    const fullNsName = getNamespaceFullName(namespace);
     return fullNsName
       .split(".")
       .map((seg) => this.toSnakeCase(seg))
       .join(".");
+  }
+
+  /** Construct a fully-qualified import path string from a file path */
+  buildImportPathForFilePath(path: string | undefined): string | undefined {
+    if (path === undefined) return undefined;
+    const emitterOutputDir = this.emitter.getOptions().emitterOutputDir;
+    if (path.startsWith(emitterOutputDir)) {
+      path = path.substring(emitterOutputDir.length + 1);
+    }
+    const val = path
+      .split("/")
+      .map((seg) => this.toSnakeCase(seg))
+      .join(".");
+    // strip the final ".py"
+    return val.substring(0, val.length - 3);
   }
 
   /** Construct a fully-qualified namespace string from a TypeSpec EmitterFramework scope. */
@@ -484,9 +499,12 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
 
   emitTypeReference(type: Type) {
     const sourceNs = this.currNamespace.slice(-1)[0];
-    const destNs = this.buildNamespaceFromModel(type as Model);
+    let destNs = this.buildImportPathForNamespace((type as Model).namespace);
     if (sourceNs !== destNs && destNs !== undefined && destNs !== "type_spec") {
       if (type.kind === "Model") {
+        if (destNs === "") {
+          destNs = ".models";
+        }
         const templateArgs = type.templateMapper?.args;
         if (templateArgs === undefined || templateArgs.length === 0) {
           this.imports.add(destNs, type.name);

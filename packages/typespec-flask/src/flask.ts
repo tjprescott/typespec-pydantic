@@ -44,7 +44,7 @@ export class FlaskEmitter extends PythonPartialOperationEmitter {
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
-    const namespace = this.buildNamespaceFromModel(model);
+    const namespace = this.buildImportPathForNamespace(model.namespace);
     const fullPath = namespace === "" ? name : `${namespace}.${name}`;
     const existing = this.declarations!.getDeclaration(fullPath);
     if (!existing) {

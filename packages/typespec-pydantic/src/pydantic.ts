@@ -277,7 +277,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
-    const namespace = this.buildNamespaceFromModel(model);
+    const namespace = this.buildImportPathForNamespace(model.namespace);
     if (namespace !== undefined) {
       this.currNamespace.push(namespace);
     }
@@ -316,7 +316,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
       return code`Dict[str, ${type ? this.emitTypeReference(type) : "None"}]`;
     } else {
       const modelName = this.transformReservedName(name ?? model.name);
-      const namespace = this.buildNamespaceFromModel(model);
+      const namespace = this.buildImportPathForNamespace(model.namespace);
       const fullPath = namespace !== "" ? `${namespace}.${modelName}` : modelName;
       if (this.declarations!.has(fullPath)) {
         return code`${modelName}`;
@@ -348,8 +348,9 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     let type: string | StringBuilder | undefined = undefined;
     type = this.emitTypeReference(property.type);
 
-    const sourceNs = property.model ? this.buildNamespaceFromModel(property.model) : undefined;
-    const destNs = property.type.kind === "Model" ? this.buildNamespaceFromModel(property.type) : undefined;
+    const sourceNs = property.model ? this.buildImportPathForNamespace(property.model.namespace) : undefined;
+    const destNs =
+      property.type.kind === "Model" ? this.buildImportPathForNamespace(property.type.namespace) : undefined;
     if (
       sourceNs !== undefined &&
       destNs !== undefined &&
@@ -486,7 +487,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
 
   scalarInstantiation(scalar: Scalar, name: string | undefined): EmitterOutput<string> {
     const converted = this.convertScalarName(scalar, name);
-    const namespace = this.buildNamespaceFromModel(scalar);
+    const namespace = this.buildImportPathForNamespace(scalar.namespace);
     const fullPath = namespace !== "" ? `${namespace}.${converted}` : converted;
     if (this.declarations!.has(fullPath)) {
       return code`${converted}`;

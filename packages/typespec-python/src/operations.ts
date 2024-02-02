@@ -64,7 +64,9 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
     builder.push(
       `${this.indent(1)}return _${pythonName}(${this.operationParameters(operation, operation.parameters, { displayTypes: false })})\n`,
     );
-    this.imports.add("._operations", `_${pythonName}`);
+    const namespace = this.buildImportPathForNamespace(operation.namespace);
+    const fullPath = namespace === undefined ? pythonName : `${namespace}._operations`;
+    this.imports.add(fullPath, `_${pythonName}`);
     return `${builder.reduce()}`;
   }
 
@@ -116,6 +118,9 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
     for (const param of parameters.properties.values()) {
       const paramName = this.transformReservedName(this.toSnakeCase(param.name));
       const paramType = this.emitter.emitTypeReference(param.type);
+      if (param.type.kind === "Model" && param.type.name !== "Array") {
+        this.imports.add(".models", param.type.name);
+      }
       builder.push(code`${paramName}`);
       if (options?.displayTypes ?? true) {
         builder.push(code`: ${paramType}`);
@@ -127,7 +132,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
 
   operationReturnType(operation: Operation, returnType: Type): EmitterOutput<string> {
     const value = code`${this.emitter.emitTypeReference(operation.returnType)}`;
-    if (returnType.kind === "Model") {
+    if (returnType.kind === "Model" && returnType.name !== "Array") {
       this.imports.add(".models", returnType.name);
     }
     return value;
@@ -136,6 +141,11 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
   interfaceOperationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
     const opName = `${operation.interface!.name}_${name}`;
     return this.operationDeclaration(operation, opName);
+  }
+
+  /** Returns true of the strings are equal, ignoring the last segment. Applies only to dot-separated strings. */
+  #rootsAreEqual(p1: string, p2: string): boolean {
+    return p1.split(".").slice(0, -1).join(".") === p2.split(".").slice(0, -1).join(".");
   }
 
   async buildImplementationFile(sourceFile: SourceFile<string>): Promise<EmittedSourceFile | undefined> {
@@ -155,15 +165,19 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
       const implFile = this.emitter.createSourceFile(path);
       const implSf = await this.emitter.emitSourceFile(implFile);
       const builder = new StringBuilder();
+      const importPath = this.buildImportPathForFilePath(path) ?? "_operations";
       const opImports = this.imports.get(sourceFile, ImportKind.regular);
-      for (const [module, imports] of opImports) {
-        builder.push(`from ${module} import ${[...imports].join(", ")}\n`);
+      for (const [module, metadata] of opImports) {
+        const names = Array.from(metadata).map((meta) => meta.name);
+        builder.push(`from ${module} import ${[...names].join(", ")}\n`);
       }
       if (opImports.size > 0) {
         builder.push("\n");
       }
-      for (const meta of this.operationMetadata.values()) {
-        builder.push(`${meta.implementation}\n`);
+      for (const [path, meta] of this.operationMetadata.entries()) {
+        if (this.#rootsAreEqual(path, importPath)) {
+          builder.push(`${meta.implementation}\n`);
+        }
       }
       implSf.contents = builder.reduce() + "\n";
       return implSf;
