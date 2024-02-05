@@ -251,7 +251,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     const sfNs = this.buildNamespaceFromPath(sourceFile.path) ?? "";
 
     // if any deferred declaration is a model, import Pydantic BaseModel
-    const deferredDecls = this.declarations!.get({ path: sfNs, defer: DeclarationDeferKind.Deferred });
+    const deferredDecls = this.declarations!.get({ rootPath: `${sfNs}.models`, defer: DeclarationDeferKind.Deferred });
     for (const item of deferredDecls) {
       if (item.source?.kind === "Model") {
         this.imports.add("pydantic", "BaseModel", ImportKind.regular, sourceFile);
@@ -279,7 +279,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
-    const namespace = this.buildImportPathForNamespace(model.namespace);
+    const namespace = this.importPathForNamespace(model.namespace);
     if (namespace !== undefined) {
       this.currNamespace.push(namespace);
     }
@@ -319,8 +319,8 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
       return code`Dict[str, ${type ? this.emitTypeReference(type) : "None"}]`;
     } else {
       const modelName = this.transformReservedName(name ?? model.name);
-      const namespace = this.buildImportPathForNamespace(model.namespace);
-      const fullPath = namespace !== "" ? `${namespace}.${modelName}` : modelName;
+      const namespace = this.importPathForNamespace(model.namespace) ?? "";
+      const fullPath = `${namespace}.${modelName}`;
       if (this.declarations!.has(fullPath)) {
         return code`${modelName}`;
       } else {
@@ -351,9 +351,8 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     let type: string | StringBuilder | undefined = undefined;
     type = this.emitTypeReference(property.type);
 
-    const sourceNs = property.model ? this.buildImportPathForNamespace(property.model.namespace) : undefined;
-    const destNs =
-      property.type.kind === "Model" ? this.buildImportPathForNamespace(property.type.namespace) : undefined;
+    const sourceNs = property.model ? this.importPathForNamespace(property.model.namespace) : undefined;
+    const destNs = property.type.kind === "Model" ? this.importPathForNamespace(property.type.namespace) : undefined;
     if (
       sourceNs !== undefined &&
       destNs !== undefined &&
@@ -492,8 +491,8 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
 
   scalarInstantiation(scalar: Scalar, name: string | undefined): EmitterOutput<string> {
     const converted = this.convertScalarName(scalar, name);
-    const namespace = this.buildImportPathForNamespace(scalar.namespace);
-    const fullPath = namespace !== "" ? `${namespace}.${converted}` : converted;
+    const namespace = this.importPathForNamespace(scalar.namespace) ?? "";
+    const fullPath = `${namespace}.${converted}`;
     if (this.declarations!.has(fullPath)) {
       return code`${converted}`;
     } else {

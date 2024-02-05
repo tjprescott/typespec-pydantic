@@ -48,6 +48,7 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
       map.set(model.path, model);
       map.set(operation.path, operation);
       const initFile = await serverEmitter.buildInitFile(map);
+      if (initFile === undefined) continue;
       await emitFile(serverEmitter.getProgram(), {
         path: initFile.path,
         content: initFile.contents,

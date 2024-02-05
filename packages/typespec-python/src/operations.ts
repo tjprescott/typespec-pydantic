@@ -70,8 +70,8 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
     builder.push(
       `${this.indent(1)}return _${pythonName}(${this.operationParameters(operation, operation.parameters, { displayTypes: false })})\n`,
     );
-    const namespace = this.buildImportPathForNamespace(operation.namespace);
-    const fullPath = namespace === undefined ? "_operations" : `${namespace}._operations`;
+    const namespace = this.importPathForNamespace(operation.namespace);
+    const fullPath = namespace === undefined ? `_operations` : `${namespace}._operations`;
     this.imports.add(fullPath, `_${pythonName}`);
     return `${builder.reduce()}`;
   }
@@ -99,7 +99,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
-    const namespace = this.buildImportPathForNamespace(model.namespace);
+    const namespace = this.importPathForNamespace(model.namespace);
     const fullPath = namespace === undefined ? name : `${namespace}.${name}`;
     const existing = this.declarations!.get({ path: fullPath })[0];
     if (!existing) {
@@ -142,7 +142,8 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
       const paramName = this.transformReservedName(this.toSnakeCase(param.name));
       const paramType = this.emitter.emitTypeReference(param.type);
       if (param.type.kind === "Model" && param.type.name !== "Array") {
-        this.imports.add("models", param.type.name);
+        const modelPath = this.importPathForNamespace(param.type.namespace);
+        this.imports.add(modelPath ?? "models", param.type.name);
       }
       builder.push(code`${paramName}`);
       if (options?.displayTypes ?? true) {
@@ -156,7 +157,8 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
   operationReturnType(operation: Operation, returnType: Type): EmitterOutput<string> {
     const value = code`${this.emitter.emitTypeReference(operation.returnType)}`;
     if (returnType.kind === "Model" && returnType.name !== "Array") {
-      this.imports.add("models", returnType.name);
+      const modelPath = this.importPathForNamespace(returnType.namespace);
+      this.imports.add(modelPath ?? "models", returnType.name);
     }
     return value;
   }
@@ -188,7 +190,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
       const implFile = this.emitter.createSourceFile(path);
       const implSf = await this.emitter.emitSourceFile(implFile);
       const builder = new StringBuilder();
-      const importPath = this.buildImportPathForFilePath(path) ?? "_operations";
+      const importPath = this.importPathForFilePath(path) ?? "_operations";
       const opImports = this.imports.get(sourceFile, ImportKind.regular);
       for (const [module, metadata] of opImports) {
         if (this.shouldOmitImport(module)) {
@@ -211,7 +213,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
   }
 
   emitTypeReference(type: Type) {
-    const destNs = this.buildImportPathForNamespace((type as Model).namespace);
+    const destNs = this.importPathForNamespace((type as Model).namespace);
     if (destNs !== "type_spec" && type.kind === "Model") {
       const templateArgs = type.templateMapper?.args;
       if (templateArgs === undefined || templateArgs.length === 0) {

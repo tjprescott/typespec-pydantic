@@ -200,7 +200,7 @@ describe("typespec-flask: core", () => {
             # TODO: Implement this
             raise NotImplementedError("Implement _my_foo")`;
       const barInitExpect = `
-        from .operations import my_foo
+        from foo_service.bar.operations import my_foo
 
         __all__ = ["my_foo"]`;
       const [results, diagnostics] = await flaskOutputFor(input);

@@ -7,6 +7,7 @@ describe("typespec-pydantic: core", () => {
   describe("namespaces", () => {
     it("namespaces as packages: all circular", async () => {
       const input = `
+      @service
       namespace A {
         model ModelA {
           name: string;
@@ -32,7 +33,7 @@ describe("typespec-pydantic: core", () => {
       }
       `;
       const aInitExpect = `
-      from .models import ModelA
+      from a.models import ModelA
 
       __all__ = ["ModelA"]
       `;
@@ -52,7 +53,7 @@ describe("typespec-pydantic: core", () => {
           c: Optional[List["ModelC"]] = Field(default=None)
       `;
       const bInitExpect = `
-      from .models import ModelB
+      from a.b.models import ModelB
 
       __all__ = ["ModelB"]
       `;
@@ -72,7 +73,7 @@ describe("typespec-pydantic: core", () => {
           c: Optional[List["ModelC"]] = Field(default=None)
       `;
       const cInitExpect = `
-      from .models import ModelC
+      from a.b.c.models import ModelC
 
       __all__ = ["ModelC"]
       `;
@@ -102,6 +103,7 @@ describe("typespec-pydantic: core", () => {
 
     it("namespaces as packages: loop", async () => {
       const input = `
+      @service
       namespace A {
         model ModelA {
           b: B.ModelB;
@@ -121,7 +123,7 @@ describe("typespec-pydantic: core", () => {
       }
       `;
       const aInitExpect = `
-      from .models import ModelA
+      from a.models import ModelA
 
       __all__ = ["ModelA"]
       `;
@@ -133,7 +135,7 @@ describe("typespec-pydantic: core", () => {
           b: ModelB
       `;
       const bInitExpect = `
-      from .models import ModelB
+      from a.b.models import ModelB
 
       __all__ = ["ModelB"]
       `;
@@ -148,7 +150,7 @@ describe("typespec-pydantic: core", () => {
           c: "ModelC"
       `;
       const cInitExpect = `
-      from .models import ModelC
+      from a.b.c.models import ModelC
 
       __all__ = ["ModelC"]
       `;
@@ -172,6 +174,7 @@ describe("typespec-pydantic: core", () => {
 
     it("namespaces as packages: lollipop", async () => {
       const input = `
+      @service
       namespace A {
         model ModelA {
           b: B.ModelB;
@@ -222,6 +225,7 @@ describe("typespec-pydantic: core", () => {
 
     it("supports anonymous template instantiations", async () => {
       const input = `
+        @service
         namespace Widgets {
           model Widget<T> {
             contents: T;
@@ -251,11 +255,11 @@ describe("typespec-pydantic: core", () => {
             widget: "WidgetString"
         `;
       const widgetInitExpect = `
-        from .models import IntWidget, WidgetString
+        from widgets.models import WidgetString, IntWidget
         
-        __all__ = ["IntWidget", "WidgetString"]`;
+        __all__ = ["WidgetString", "IntWidget"]`;
       const partsInitExpect = `
-        from .models import WidgetPart
+        from widgets.parts.models import WidgetPart
         
         __all__ = ["WidgetPart"]`;
       const [results, diagnostics] = await pydanticOutputFor(input);

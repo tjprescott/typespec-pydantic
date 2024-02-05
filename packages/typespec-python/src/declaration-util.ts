@@ -17,13 +17,14 @@ export interface DeclarationFilters {
   kind?: DeclarationKind;
   defer?: DeclarationDeferKind;
   path?: string;
+  rootPath?: string;
   sourceFile?: SourceFile<string>;
 }
 
 export interface DeclarationMetadata {
   name: string;
   kind: DeclarationKind;
-  path: string | undefined;
+  importPath: string | undefined;
   decl?: Declaration<string>;
   omit: boolean;
   deferred: DeclarationDeferKind;
@@ -50,16 +51,18 @@ export interface DeferredDeclarationOptions {
 export class DeclarationManager {
   private declarations = new Map<string, DeclarationMetadata>();
 
+  public readonly globalSentinel = "_GLOBAL_";
+
   declare(emitter: PythonPartialEmitter, options: DeclarationOptions): Declaration<string> {
     const sf = options.sourceFile ?? emitter.getSourceFile();
     const decl = emitter.declaration(options.name, options.value ?? "");
     decl.meta["omit"] = options.omit;
-    const path = emitter.buildImportPathForNamespace(options.namespace);
-    const fullPath = path === undefined ? options.name : `${path}.${options.name}`;
-    this.declarations.set(fullPath, {
+    const importPath = emitter.importPathForNamespace(options.namespace);
+    const declarationKey = importPath === undefined ? options.name : `${importPath}.${options.name}`;
+    this.declarations.set(declarationKey, {
       name: options.name,
       kind: options.kind,
-      path: path,
+      importPath: importPath,
       decl: decl,
       omit: options.omit,
       deferred: DeclarationDeferKind.NotDeferred,
@@ -70,10 +73,12 @@ export class DeclarationManager {
   }
 
   defer(path: string, options: DeferredDeclarationOptions) {
-    this.declarations.set(`${path}`, {
+    const declarationKey = path;
+    const importPath = path.split(".").slice(0, -1).join(".");
+    this.declarations.set(declarationKey, {
       name: options.name,
       kind: options.kind,
-      path: path,
+      importPath: importPath,
       decl: undefined,
       omit: options.omit,
       deferred: DeclarationDeferKind.Deferred,
@@ -82,11 +87,14 @@ export class DeclarationManager {
     });
   }
 
+  /** Returns true of the strings are equal, ignoring the last segment. Applies only to dot-separated strings. */
+  #rootsAreEqual(p1: string, p2: string): boolean {
+    const p1Root = p1.split(".").slice(0, -1).join(".");
+    const p2Root = p2.split(".").slice(0, -1).join(".");
+    return p1Root === p2Root;
+  }
+
   get(opts: DeclarationFilters): DeclarationMetadata[] {
-    // if no filters, just return everything that's not set to be omitted
-    if (opts.defer === undefined && opts.kind === undefined && opts.path === undefined) {
-      return Array.from(this.declarations.values()).filter((decl) => !decl.omit);
-    }
     const decls: DeclarationMetadata[] = [];
     for (const [key, val] of this.declarations.entries()) {
       // never return omitted declarations. These are needed only for the emitter framework.
@@ -94,6 +102,7 @@ export class DeclarationManager {
       if (opts.kind !== undefined && val.kind !== opts.kind) continue;
       if (opts.defer !== undefined && val.deferred !== opts.defer) continue;
       if (opts.path !== undefined && key !== opts.path) continue;
+      if (opts.rootPath !== undefined && !this.#rootsAreEqual(key, opts.rootPath)) continue;
       if (opts.sourceFile !== undefined && val.sourceFile !== opts.sourceFile) continue;
       decls.push(val);
     }
