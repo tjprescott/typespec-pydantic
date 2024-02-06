@@ -44,8 +44,6 @@ interface UnionVariantMetadata {
 export const GlobalNamespace = Symbol.for("GlobalNamespace");
 
 export abstract class PythonPartialEmitter extends CodeTypeEmitter {
-  protected currNamespace: string[] = [];
-
   protected imports: ImportManager;
 
   public declarations?: DeclarationManager;
@@ -554,9 +552,8 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   }
 
   emitTypeReference(type: Type) {
-    const sourceNs = this.currNamespace.slice(-1)[0];
     const destNs = this.importPathForNamespace((type as Model).namespace);
-    if (sourceNs !== destNs && destNs !== "type_spec") {
+    if (destNs !== "type_spec") {
       if (type.kind === "Model") {
         const templateArgs = type.templateMapper?.args;
         if (templateArgs === undefined || templateArgs.length === 0) {

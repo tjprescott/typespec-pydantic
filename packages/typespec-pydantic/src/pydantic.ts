@@ -284,10 +284,6 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
-    const namespace = this.importPathForNamespace(model.namespace);
-    if (typeof namespace === "string") {
-      this.currNamespace.push(namespace);
-    }
     const builder = new StringBuilder();
     const baseModel = model.baseModel?.name ?? "BaseModel";
     if (baseModel === "BaseModel") {
@@ -302,7 +298,6 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     } else {
       builder.push(code`${this.indent()}pass`);
     }
-    this.currNamespace.pop();
     return this.declarations!.declare(this, {
       name: name,
       namespace: model.namespace,
