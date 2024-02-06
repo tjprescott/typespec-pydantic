@@ -324,6 +324,12 @@ importers:
       '@typespec/compiler':
         specifier: ^0.51.0
         version: 0.51.0
+      '@typespec/http':
+        specifier: ^0.51.0
+        version: 0.51.0(@typespec/compiler@0.51.0)
+      '@typespec/rest':
+        specifier: ^0.51.0
+        version: 0.51.0(@typespec/compiler@0.51.0)(@typespec/http@0.51.0)
     devDependencies:
       '@changesets/cli':
         specifier: ^2.27.1

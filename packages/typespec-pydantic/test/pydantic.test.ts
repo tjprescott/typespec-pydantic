@@ -7,6 +7,7 @@ describe("typespec-pydantic: core", () => {
   describe("namespaces", () => {
     it("namespaces as packages: all circular", async () => {
       const input = `
+      @service
       namespace A {
         model ModelA {
           name: string;
@@ -32,7 +33,7 @@ describe("typespec-pydantic: core", () => {
       }
       `;
       const aInitExpect = `
-      from .models import ModelA
+      from a.models import ModelA
 
       __all__ = ["ModelA"]
       `;
@@ -52,7 +53,7 @@ describe("typespec-pydantic: core", () => {
           c: Optional[List["ModelC"]] = Field(default=None)
       `;
       const bInitExpect = `
-      from .models import ModelB
+      from a.b.models import ModelB
 
       __all__ = ["ModelB"]
       `;
@@ -72,7 +73,7 @@ describe("typespec-pydantic: core", () => {
           c: Optional[List["ModelC"]] = Field(default=None)
       `;
       const cInitExpect = `
-      from .models import ModelC
+      from a.b.c.models import ModelC
 
       __all__ = ["ModelC"]
       `;
@@ -95,13 +96,14 @@ describe("typespec-pydantic: core", () => {
       compare(aModelExpect, results[0].contents, false);
       compare(bModelExpect, results[1].contents, false);
       compare(cModelExpect, results[2].contents, false);
-      compare(aInitExpect, results[3].contents, false);
+      compare(cInitExpect, results[3].contents, false);
       compare(bInitExpect, results[4].contents, false);
-      compare(cInitExpect, results[5].contents, false);
+      compare(aInitExpect, results[5].contents, false);
     });
 
     it("namespaces as packages: loop", async () => {
       const input = `
+      @service
       namespace A {
         model ModelA {
           b: B.ModelB;
@@ -121,7 +123,7 @@ describe("typespec-pydantic: core", () => {
       }
       `;
       const aInitExpect = `
-      from .models import ModelA
+      from a.models import ModelA
 
       __all__ = ["ModelA"]
       `;
@@ -133,7 +135,7 @@ describe("typespec-pydantic: core", () => {
           b: ModelB
       `;
       const bInitExpect = `
-      from .models import ModelB
+      from a.b.models import ModelB
 
       __all__ = ["ModelB"]
       `;
@@ -148,7 +150,7 @@ describe("typespec-pydantic: core", () => {
           c: "ModelC"
       `;
       const cInitExpect = `
-      from .models import ModelC
+      from a.b.c.models import ModelC
 
       __all__ = ["ModelC"]
       `;
@@ -165,13 +167,14 @@ describe("typespec-pydantic: core", () => {
       compare(aModelExpect, results[0].contents, false);
       compare(bModelExpect, results[1].contents, false);
       compare(cModelExpect, results[2].contents, false);
-      compare(aInitExpect, results[3].contents, false);
+      compare(cInitExpect, results[3].contents, false);
       compare(bInitExpect, results[4].contents, false);
-      compare(cInitExpect, results[5].contents, false);
+      compare(aInitExpect, results[5].contents, false);
     });
 
     it("namespaces as packages: lollipop", async () => {
       const input = `
+      @service
       namespace A {
         model ModelA {
           b: B.ModelB;
@@ -222,6 +225,7 @@ describe("typespec-pydantic: core", () => {
 
     it("supports anonymous template instantiations", async () => {
       const input = `
+        @service
         namespace Widgets {
           model Widget<T> {
             contents: T;
@@ -251,11 +255,11 @@ describe("typespec-pydantic: core", () => {
             widget: "WidgetString"
         `;
       const widgetInitExpect = `
-        from .models import IntWidget, WidgetString
+        from widgets.models import WidgetString, IntWidget
         
-        __all__ = ["IntWidget", "WidgetString"]`;
+        __all__ = ["WidgetString", "IntWidget"]`;
       const partsInitExpect = `
-        from .models import WidgetPart
+        from widgets.parts.models import WidgetPart
         
         __all__ = ["WidgetPart"]`;
       const [results, diagnostics] = await pydanticOutputFor(input);
@@ -263,9 +267,8 @@ describe("typespec-pydantic: core", () => {
       strictEqual(results.length, 4);
       compare(widgetsExpect, results[0].contents, false);
       compare(partsExpect, results[1].contents, false);
-      // FIXME: Deferred import is not being picked up
-      compare(widgetInitExpect, results[2].contents, false);
-      compare(partsInitExpect, results[3].contents, false);
+      compare(partsInitExpect, results[2].contents, false);
+      compare(widgetInitExpect, results[3].contents, false);
     });
   });
 

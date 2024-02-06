@@ -1,5 +1,11 @@
 import { AssetEmitter, SourceFile } from "@typespec/compiler/emitter-framework";
 
+interface ImportMetadata {
+  kind: ImportKind;
+  module: string;
+  name: string;
+}
+
 /** The kind of import (regular or deferred) */
 export enum ImportKind {
   /** A top-level module import */
@@ -9,9 +15,7 @@ export enum ImportKind {
 }
 
 export class ImportManager {
-  private imports = new Map<SourceFile<string>, Map<string, Set<string>>>();
-
-  private deferredImports = new Map<SourceFile<string>, Map<string, Set<string>>>();
+  private imports = new Map<SourceFile<string>, Map<string, Set<ImportMetadata>>>();
 
   private emitter: AssetEmitter<string, Record<string, never>>;
 
@@ -19,18 +23,35 @@ export class ImportManager {
     this.emitter = emitter;
   }
 
-  getImports(sourceFile: SourceFile<string>, kind: ImportKind): Map<string, Set<string>> {
-    const fileImports = kind === ImportKind.deferred ? this.deferredImports : this.imports;
-    return fileImports.get(sourceFile) ?? new Map<string, Set<string>>();
+  get(sourceFile: SourceFile<string>, kind: ImportKind): Map<string, Set<ImportMetadata>> {
+    const imports = new Map<string, Set<ImportMetadata>>();
+    const fileImports = this.imports.get(sourceFile);
+    if (fileImports === undefined) {
+      return imports;
+    }
+    for (const [module, moduleImports] of fileImports) {
+      const moduleSet = new Set<ImportMetadata>();
+      for (const importMetadata of moduleImports) {
+        if (importMetadata.kind === kind) {
+          moduleSet.add(importMetadata);
+        }
+      }
+      if (moduleSet.size > 0) {
+        imports.set(module, moduleSet);
+      }
+    }
+    return imports;
   }
 
   has(sourceFile: SourceFile<string>, module: string, name: string, kind: ImportKind): boolean {
-    const fileImports =
-      kind === ImportKind.deferred ? this.deferredImports.get(sourceFile) : this.imports.get(sourceFile);
+    const fileImports = this.imports.get(sourceFile);
     if (fileImports === undefined) return false;
     const moduleImports = fileImports.get(module);
     if (moduleImports === undefined) return false;
-    return moduleImports.has(name);
+    // if any moduleImport has a matching name and kind return true
+    return Array.from(moduleImports).some(
+      (importMetadata) => importMetadata.name === name && importMetadata.kind === kind,
+    );
   }
 
   add(module: string, name: string, kind: ImportKind = ImportKind.regular, sourceFile?: SourceFile<string>) {
@@ -54,26 +75,31 @@ export class ImportManager {
       // if a deferred import exists we won't use a regular import
       return;
     }
-    const fileImports =
-      (kind === ImportKind.deferred ? this.deferredImports.get(sourceFile) : this.imports.get(sourceFile)) ??
-      new Map<string, Set<string>>();
-    const moduleImports = fileImports.get(module) ?? new Set<string>();
-    moduleImports.add(name);
-    fileImports.set(module, moduleImports);
-    if (kind === ImportKind.deferred) {
-      this.deferredImports.set(sourceFile, fileImports);
-    } else {
-      this.imports.set(sourceFile, fileImports);
+    const fileImports = this.imports.get(sourceFile) ?? new Map<string, Set<ImportMetadata>>();
+    const moduleImports = fileImports.get(module) ?? new Set<ImportMetadata>();
+    const metadata = { kind, module, name };
+    const exists = Array.from(moduleImports).some(
+      (importMetadata) => importMetadata.name === name && importMetadata.kind === kind,
+    );
+    if (!exists) {
+      moduleImports.add(metadata);
     }
+    fileImports.set(module, moduleImports);
+    this.imports.set(sourceFile, fileImports);
   }
 
   #delete(sourceFile: SourceFile<string>, module: string, name: string, kind: ImportKind) {
-    const fileImports =
-      kind === ImportKind.deferred ? this.deferredImports.get(sourceFile) : this.imports.get(sourceFile);
+    const fileImports = this.imports.get(sourceFile);
     if (fileImports === undefined) return;
     const moduleImports = fileImports.get(module);
     if (moduleImports === undefined) return;
-    moduleImports.delete(name);
+    // remove the item form the set if name and kind match
+    for (const importMetadata of moduleImports) {
+      if (importMetadata.name === name && importMetadata.kind === kind) {
+        moduleImports.delete(importMetadata);
+        break;
+      }
+    }
     moduleImports.size === 0 && fileImports.delete(module);
   }
 }

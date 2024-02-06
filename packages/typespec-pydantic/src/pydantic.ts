@@ -1,12 +1,18 @@
-import { ImportKind, DeclarationManager, DeclarationKind, PythonPartialModelEmitter } from "typespec-python";
+import {
+  ImportKind,
+  DeclarationManager,
+  DeclarationKind,
+  PythonPartialModelEmitter,
+  createEmitters,
+  DeclarationDeferKind,
+  GlobalNamespace,
+} from "typespec-python";
 import {
   EmitContext,
   Enum,
   EnumMember,
-  Interface,
   Model,
   ModelProperty,
-  Operation,
   Scalar,
   Type,
   Union,
@@ -24,7 +30,6 @@ import {
   getVisibility,
 } from "@typespec/compiler";
 import {
-  AssetEmitter,
   EmitEntity,
   EmittedSourceFile,
   EmitterOutput,
@@ -38,28 +43,19 @@ import {
 import { getFields } from "./decorators.js";
 
 export async function $onEmit(context: EmitContext<Record<string, never>>) {
-  const defaultDeclarationManager = new DeclarationManager();
-  const emitter = new PydanticEmitter(
-    context.getAssetEmitter(
-      class extends PydanticEmitter {
-        constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
-          super(emitter);
-          this.declarations = declarations ?? defaultDeclarationManager;
-        }
-      },
-    ),
-    defaultDeclarationManager,
-  );
+  const emitter = createEmitters(context.program, PydanticEmitter, context)[0] as PydanticEmitter;
+  emitter.declarations = new DeclarationManager();
   emitter.emitProgram({ emitTypeSpecNamespace: false });
   await emitter.writeAllOutput();
   if (!emitter.getProgram().compilerOptions.noEmit) {
     for (const sourceFile of emitter.getSourceFiles()) {
       if (sourceFile.globalScope.declarations.length > 0) {
         const initFile = await emitter.buildInitFile(new Map([[sourceFile.path, sourceFile]]));
-        await emitFile(emitter.getProgram(), {
-          path: initFile.path,
-          content: initFile.contents,
-        });
+        if (initFile !== undefined)
+          await emitFile(emitter.getProgram(), {
+            path: initFile.path,
+            content: initFile.contents,
+          });
       }
     }
   }
@@ -127,11 +123,6 @@ interface PydanticFieldMetadata {
 }
 
 export class PydanticEmitter extends PythonPartialModelEmitter {
-  constructor(emitter: AssetEmitter<string, Record<string, never>>, declarations?: DeclarationManager) {
-    super(emitter);
-    this.declarations = declarations;
-  }
-
   #emitFieldValue(value: string | StringBuilder | number | boolean | Type | string[] | null): string | StringBuilder {
     if (typeof value === "boolean") {
       return value ? "True" : "False";
@@ -258,11 +249,15 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
-    const sfNs = this.buildNamespaceFromPath(sourceFile.path) ?? "";
+    const sfNs = this.buildNamespaceFromPath(sourceFile.path);
+    if (sfNs === undefined) throw new Error(`Namespace for source file ${sourceFile.path} is undefined`);
 
     // if any deferred declaration is a model, import Pydantic BaseModel
-    const deferredDeclarations = this.declarations!.getDeferredDeclarations(sfNs);
-    for (const item of deferredDeclarations) {
+    const deferredDecls = this.declarations!.get({
+      rootPath: sfNs === GlobalNamespace ? `models` : `${sfNs}.models`,
+      defer: DeclarationDeferKind.Deferred,
+    });
+    for (const item of deferredDecls) {
       if (item.source?.kind === "Model") {
         this.imports.add("pydantic", "BaseModel", ImportKind.regular, sourceFile);
         break;
@@ -282,15 +277,15 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
       const sourcePath = this.buildNamespaceFromScope(scope);
       if (targetPath !== sourcePath) {
         this.imports.add("typing", "TYPE_CHECKING");
-        this.imports.add(targetPath, targetName, ImportKind.deferred);
+        this.imports.add(targetPath === GlobalNamespace ? "models" : targetPath, targetName, ImportKind.deferred);
       }
     }
     return super.circularReference(target, scope, cycle);
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
-    const namespace = this.buildNamespaceFromModel(model);
-    if (namespace !== undefined) {
+    const namespace = this.importPathForNamespace(model.namespace);
+    if (typeof namespace === "string") {
       this.currNamespace.push(namespace);
     }
     const builder = new StringBuilder();
@@ -310,9 +305,11 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     this.currNamespace.pop();
     return this.declarations!.declare(this, {
       name: name,
+      namespace: model.namespace,
       kind: DeclarationKind.Model,
       value: builder.reduce(),
       omit: false,
+      globalImportPath: "models",
     });
   }
 
@@ -328,8 +325,8 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
       return code`Dict[str, ${type ? this.emitTypeReference(type) : "None"}]`;
     } else {
       const modelName = this.transformReservedName(name ?? model.name);
-      const namespace = this.buildNamespaceFromModel(model);
-      const fullPath = namespace !== "" ? `${namespace}.${modelName}` : modelName;
+      const namespace = this.importPathForNamespace(model.namespace) ?? "";
+      const fullPath = `${String(namespace)}.${modelName}`;
       if (this.declarations!.has(fullPath)) {
         return code`${modelName}`;
       } else {
@@ -338,6 +335,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
           kind: DeclarationKind.Model,
           source: model,
           omit: false,
+          globalImportPath: "models",
         });
         return code`"${modelName}"`;
       }
@@ -360,8 +358,8 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     let type: string | StringBuilder | undefined = undefined;
     type = this.emitTypeReference(property.type);
 
-    const sourceNs = property.model ? this.buildNamespaceFromModel(property.model) : undefined;
-    const destNs = property.type.kind === "Model" ? this.buildNamespaceFromModel(property.type) : undefined;
+    const sourceNs = property.model ? this.importPathForNamespace(property.model.namespace) : undefined;
+    const destNs = property.type.kind === "Model" ? this.importPathForNamespace(property.type.namespace) : undefined;
     if (
       sourceNs !== undefined &&
       destNs !== undefined &&
@@ -369,7 +367,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
       destNs !== "type_spec" &&
       type instanceof Placeholder === false
     ) {
-      this.imports.add(destNs, type.toString());
+      this.imports.add(destNs === GlobalNamespace ? "models" : destNs, type.toString());
     }
 
     // don't emit anything if type is `never`
@@ -419,9 +417,11 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     builder.push(code`${members}`);
     return this.declarations!.declare(this, {
       name: name,
+      namespace: en.namespace,
       kind: DeclarationKind.Model,
       value: builder.reduce(),
       omit: false,
+      globalImportPath: "models",
     });
   }
 
@@ -457,9 +457,11 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     builder.push(code`${this.indent()}def __getitem__(self, item):\n${this.indent(2)}return self.root[item]\n\n`);
     return this.declarations!.declare(this, {
       name: name,
+      namespace: array.namespace,
       kind: DeclarationKind.Model,
       value: builder.reduce(),
       omit: false,
+      globalImportPath: "models",
     });
   }
 
@@ -498,8 +500,8 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
 
   scalarInstantiation(scalar: Scalar, name: string | undefined): EmitterOutput<string> {
     const converted = this.convertScalarName(scalar, name);
-    const namespace = this.buildNamespaceFromModel(scalar);
-    const fullPath = namespace !== "" ? `${namespace}.${converted}` : converted;
+    const namespace = this.importPathForNamespace(scalar.namespace);
+    const fullPath = `${String(namespace)}.${converted}`;
     if (this.declarations!.has(fullPath)) {
       return code`${converted}`;
     } else {
@@ -508,37 +510,20 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
         kind: DeclarationKind.Model,
         source: scalar,
         omit: false,
+        globalImportPath: "models",
       });
       return code`"${converted}"`;
     }
   }
 
-  operationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
-    // Operations not supported
-    return this.emitter.result.none();
-  }
-
-  operationReturnType(operation: Operation, returnType: Type): EmitterOutput<string> {
-    // Operations not supported
-    return this.emitter.result.none();
-  }
-
-  interfaceDeclaration(iface: Interface, name: string): EmitterOutput<string> {
-    // Operation interfaces not supported
-    return this.emitter.result.none();
-  }
-
-  interfaceOperationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
-    // Operation interfaces not supported
-    return this.emitter.result.none();
-  }
-
   unionDeclaration(union: Union, name: string): EmitterOutput<string> {
     return this.declarations!.declare(this, {
       name: name,
+      namespace: union.namespace,
       kind: DeclarationKind.Model,
       value: undefined,
       omit: true,
+      globalImportPath: "models",
     });
   }
 

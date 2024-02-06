@@ -6,6 +6,7 @@ import {
   PythonPartialEmitter,
   PythonPartialModelEmitter,
   PythonPartialOperationEmitter,
+  createEmitters,
 } from "typespec-python";
 import { FlaskEmitter } from "typespec-flask";
 
@@ -47,10 +48,20 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
       map.set(model.path, model);
       map.set(operation.path, operation);
       const initFile = await serverEmitter.buildInitFile(map);
+      if (initFile === undefined) continue;
       await emitFile(serverEmitter.getProgram(), {
         path: initFile.path,
         content: initFile.contents,
       });
+      if (meta.operation !== undefined) {
+        const implFile = await operationEmitter.buildImplementationFile(meta.operation);
+        if (implFile !== undefined) {
+          await emitFile(operationEmitter.getProgram(), {
+            path: implFile.path,
+            content: implFile.contents,
+          });
+        }
+      }
     }
   }
 }
@@ -62,25 +73,11 @@ export class PythonServerEmitter extends PythonPartialEmitter {
   constructor(emitter: AssetEmitter<string, Record<string, never>>, context: EmitContext<Record<string, never>>) {
     const declarations = new DeclarationManager();
     super(emitter);
+    this.modelEmitter = createEmitters(context.program, PydanticEmitter, context)[0] as PydanticEmitter;
+    this.operationEmitter = createEmitters(context.program, FlaskEmitter, context)[0] as FlaskEmitter;
     this.declarations = declarations;
-    this.modelEmitter = new PydanticEmitter(
-      context.getAssetEmitter(
-        class extends PydanticEmitter {
-          constructor(emitter: AssetEmitter<string, Record<string, never>>) {
-            super(emitter, declarations);
-          }
-        },
-      ),
-    );
-    this.operationEmitter = new FlaskEmitter(
-      context.getAssetEmitter(
-        class extends FlaskEmitter {
-          constructor(emitter: AssetEmitter<string, Record<string, never>>) {
-            super(emitter, declarations);
-          }
-        },
-      ),
-    );
+    this.modelEmitter.declarations = declarations;
+    this.operationEmitter.declarations = declarations;
   }
 
   emitScalar(scalar: Scalar, name: string, sourceFile?: SourceFile<string> | undefined): string | Placeholder<string> {

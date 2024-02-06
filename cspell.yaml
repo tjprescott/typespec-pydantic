@@ -10,6 +10,8 @@ words:
   - cadl
   - repr
   - regen
+  - keyer
+  - intern
 ignorePaths:
   - "**/node_modules/**"
   - "**/dist/**"

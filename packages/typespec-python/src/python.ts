@@ -4,7 +4,6 @@ import {
   Model,
   Namespace,
   NumericLiteral,
-  Operation,
   Program,
   Scalar,
   StringLiteral,
@@ -15,6 +14,8 @@ import {
   getDiscriminator,
   getDoc,
   getNamespaceFullName,
+  getService,
+  navigateProgram,
 } from "@typespec/compiler";
 import {
   AssetEmitter,
@@ -32,7 +33,7 @@ import {
   code,
 } from "@typespec/compiler/emitter-framework";
 import { ImportManager, ImportKind } from "./import-util.js";
-import { DeclarationManager } from "./declaration-util.js";
+import { DeclarationDeferKind, DeclarationKind, DeclarationManager } from "./declaration-util.js";
 import { reportDiagnostic } from "./lib.js";
 
 interface UnionVariantMetadata {
@@ -40,17 +41,14 @@ interface UnionVariantMetadata {
   value: string | StringBuilder;
 }
 
-interface OperationParameterOptions {
-  /** operation parameters should display type info */
-  displayTypes?: boolean;
-}
+export const GlobalNamespace = Symbol.for("GlobalNamespace");
 
 export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   protected currNamespace: string[] = [];
 
   protected imports: ImportManager;
 
-  protected declarations?: DeclarationManager;
+  public declarations?: DeclarationManager;
 
   constructor(emitter: AssetEmitter<string, Record<string, never>>) {
     super(emitter);
@@ -58,6 +56,23 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   }
 
   protected createProgramContext(fileName: string): Context {
+    const program = this.getProgram();
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const emitter = this;
+    let hasServiceNamespace = false;
+    navigateProgram(program, {
+      namespace(ns) {
+        if (emitter.isInServiceNamespace(ns)) {
+          hasServiceNamespace = true;
+          return;
+        }
+      },
+    });
+    // Only create a program context if the TypeSpec does not use any service namespaces.
+    // Otherwise, we create namespace contexts.
+    if (hasServiceNamespace) {
+      return {};
+    }
     const options = this.emitter.getOptions();
     const resolvedFileName = options["output-file"] ?? fileName;
     const sourceFile = this.emitter.createSourceFile(resolvedFileName);
@@ -66,8 +81,18 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     };
   }
 
+  private isInServiceNamespace(namespace: Namespace): boolean {
+    if (getService(this.getProgram(), namespace) !== undefined) {
+      return true;
+    } else if (namespace.namespace !== undefined) {
+      return this.isInServiceNamespace(namespace.namespace);
+    }
+    return false;
+  }
+
   protected createNamespaceContext(namespace: Namespace, fileName: string): Context {
-    if (namespace.name === "TypeSpec") {
+    // only create namespace context when the namespace is part of the service
+    if (!this.isInServiceNamespace(namespace)) {
       return {};
     }
     const file = this.emitter.createSourceFile(this.buildFilePath(namespace, fileName));
@@ -76,29 +101,58 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     };
   }
 
-  async buildInitFile(map: Map<string, SourceFile<string>>): Promise<EmittedSourceFile> {
-    const path = map.keys().next().value.split("/").slice(0, -1).join("/");
-    const initFile = this.emitter.createSourceFile(`${path}/__init__.py`);
-    const initSf = await this.emitter.emitSourceFile(initFile);
-    const builder = new StringBuilder();
-    const all = new Set<string>();
-    for (const [path, file] of map) {
-      const fileName = path.split("/").pop()?.split(".")[0];
-      const decls = this.filterOmittedDeclarations(file.globalScope.declarations).map((decl) => decl.name);
-      const deferredDecls = this.declarations?.getDeferredDeclarations(this.buildNamespaceFromPath(path));
-      if (deferredDecls !== undefined) {
-        for (const deferredDecl of deferredDecls) {
-          decls.push(deferredDecl.name);
+  async buildInitFile(map: Map<string, SourceFile<string>>): Promise<EmittedSourceFile | undefined> {
+    // ensure that all paths have the same root path
+    const rootPaths = [...map.keys()].map((path) => path.split("/").slice(0, -1).join("/"));
+    const areAllPathsEqual = rootPaths.every((path) => path === rootPaths[0]);
+    if (!areAllPathsEqual) {
+      throw new Error("All paths must have the same root path");
+    }
+
+    // createSourceFile prepends emitterOutputDir to the path, so remove it, if present.
+    let rootPath = rootPaths[0];
+    const emitterOutputDir = this.emitter.getOptions().emitterOutputDir;
+    if (rootPath.startsWith(emitterOutputDir)) {
+      rootPath = rootPath.substring(emitterOutputDir.length + 1);
+    }
+    const initPath = rootPath !== "" ? `${rootPath}/__init__.py` : "__init__.py";
+    try {
+      // FIXME: workaround to prevent and endless loop where init files keep getting added to the collection
+      // that is being iterated upon. This has a the downside that if the __init__ file already exists, it
+      // does not get recreated, but it should!
+      await this.emitter.getProgram().host.readFile(`${emitterOutputDir}/${initPath}`);
+      return undefined;
+    } catch (e) {
+      const initFile = this.emitter.createSourceFile(initPath);
+      const initSf = await this.emitter.emitSourceFile(initFile);
+      const builder = new StringBuilder();
+      const all = new Set<string>();
+      for (const [path, _] of map) {
+        const importPath = this.importPathForFilePath(path);
+        const decls = this.declarations?.get({
+          rootPath: importPath,
+        });
+        if (decls === undefined || decls.length === 0) continue;
+        const declNames = decls.map((decl) => decl.name);
+        const refDecl = decls[0];
+        if (refDecl.importPath === GlobalNamespace) {
+          builder.push(`from ${refDecl.globalImportPath} import ${declNames.join(", ")}\n`);
+        } else {
+          // __init__ files are special in that we need this syntax to ensure the final part is needed generally
+          builder.push(`from ${refDecl.importPath}.${refDecl.globalImportPath} import ${declNames.join(", ")}\n`);
+        }
+        for (const decl of declNames) {
+          all.add(`"${decl}"`);
         }
       }
-      builder.push(`from .${fileName} import ${decls.join(", ")}\n`);
-      for (const decl of decls) {
-        all.add(`"${decl}"`);
+      if (all.size > 0) {
+        builder.push(`\n__all__ = [${[...all].join(", ")}]`);
+        initSf.contents = builder.reduce() + "\n";
+      } else {
+        initSf.contents = "";
       }
+      return initSf;
     }
-    builder.push(`\n__all__ = [${[...all].join(", ")}]`);
-    initSf.contents = builder.reduce() + "\n";
-    return initSf;
   }
 
   /** Constructs a file system path for a given namespace. If a fileName is provided,
@@ -310,18 +364,34 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     return undefined;
   }
 
-  /** Construct a fully-qualified namespace string from a model. */
-  buildNamespaceFromModel(model: Model | Scalar): string | undefined {
-    if (model.namespace === undefined) return undefined;
-    const fullNsName = getNamespaceFullName(model.namespace);
-    return fullNsName
+  /** Construct a fully-qualified import path string from a namespace */
+  importPathForNamespace(namespace: Namespace | undefined): string | typeof GlobalNamespace {
+    if (namespace === undefined) return GlobalNamespace;
+    const fullNsName = getNamespaceFullName(namespace)
       .split(".")
       .map((seg) => this.toSnakeCase(seg))
       .join(".");
+    return fullNsName === "" ? GlobalNamespace : fullNsName;
+  }
+
+  /** Construct a fully-qualified import path string from a file path */
+  importPathForFilePath(path: string | undefined): string | typeof GlobalNamespace | undefined {
+    if (path === undefined) return undefined;
+    const emitterOutputDir = this.emitter.getOptions().emitterOutputDir;
+    if (path.startsWith(emitterOutputDir)) {
+      path = path.substring(emitterOutputDir.length + 1);
+    }
+    let val = path
+      .split("/")
+      .map((seg) => this.toSnakeCase(seg))
+      .join(".");
+    // strip the final ".py"
+    val = val.substring(0, val.length - 3);
+    return val === "" ? GlobalNamespace : val;
   }
 
   /** Construct a fully-qualified namespace string from a TypeSpec EmitterFramework scope. */
-  buildNamespaceFromScope(dest: Scope<string>): string {
+  buildNamespaceFromScope(dest: Scope<string>): string | typeof GlobalNamespace {
     if (dest.kind !== "sourceFile") {
       throw new Error("Expected a source file");
     }
@@ -333,16 +403,17 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     if (destPath.startsWith("/")) {
       destPath = destPath.substring(1);
     }
-    return destPath.split("/").slice(0, -1).join(".");
+    destPath = destPath.split("/").slice(0, -1).join(".");
+    return destPath === "" ? GlobalNamespace : destPath;
   }
 
   /** Accepts a path and returns the fully-qualified namespace */
-  buildNamespaceFromPath(path: string): string | undefined {
+  buildNamespaceFromPath(path: string): string | typeof GlobalNamespace | undefined {
     const segments = path.split("/");
     if (segments.length > 2) {
       return segments.slice(1, -1).join(".");
     } else {
-      return undefined;
+      return GlobalNamespace;
     }
   }
 
@@ -484,12 +555,12 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
 
   emitTypeReference(type: Type) {
     const sourceNs = this.currNamespace.slice(-1)[0];
-    const destNs = this.buildNamespaceFromModel(type as Model);
-    if (sourceNs !== destNs && destNs !== undefined && destNs !== "type_spec") {
+    const destNs = this.importPathForNamespace((type as Model).namespace);
+    if (sourceNs !== destNs && destNs !== "type_spec") {
       if (type.kind === "Model") {
         const templateArgs = type.templateMapper?.args;
         if (templateArgs === undefined || templateArgs.length === 0) {
-          this.imports.add(destNs, type.name);
+          this.imports.add(destNs === GlobalNamespace ? "models" : destNs, type.name);
         }
       }
     }
@@ -500,21 +571,12 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     return code`${value}`;
   }
 
-  /** Filters out declarations that should not actually be emitted. */
-  // FIXME: Move this logic up into DeclarationManager
-  private filterOmittedDeclarations(declarations: Declaration<string>[]): Declaration<string>[] {
-    const filtered = declarations.filter((decl) => decl.meta["omit"] === false);
-    return filtered;
-  }
-
   async writeOutput(sourceFiles: SourceFile<string>[]): Promise<void> {
     const toEmit: EmittedSourceFile[] = [];
     for (const file of sourceFiles) {
-      // eliminate duplicate declarations
-      file.globalScope.declarations = [...new Set([...file.globalScope.declarations])];
-
       // don't emit empty files
-      if (file.globalScope.declarations.length === 0) continue;
+      const decls = this.declarations!.get({ kind: DeclarationKind.Model, sourceFile: file });
+      if (decls.length === 0) continue;
 
       const mainSf = await this.emitter.emitSourceFile(file);
       toEmit.push(mainSf);
@@ -537,15 +599,17 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     const builder = new StringBuilder();
 
     // render imports
-    const fileImports = this.imports.getImports(sourceFile, ImportKind.regular);
-    for (const [moduleName, names] of fileImports) {
+    const fileImports = this.imports.get(sourceFile, ImportKind.regular);
+    for (const [moduleName, metadata] of fileImports) {
+      const names = Array.from(metadata).map((meta) => meta.name);
       builder.push(code`from ${moduleName} import ${[...names].join(", ")}\n`);
     }
 
-    const deferredImports = this.imports.getImports(sourceFile, ImportKind.deferred);
+    const deferredImports = this.imports.get(sourceFile, ImportKind.deferred);
     if (deferredImports.size > 0) {
       builder.push(code`\nif TYPE_CHECKING:\n`);
-      for (const [moduleName, names] of deferredImports) {
+      for (const [moduleName, metadata] of deferredImports) {
+        const names = Array.from(metadata).map((meta) => meta.name);
         builder.push(code`${this.indent()}from ${moduleName} import ${[...names].join(", ")}\n`);
       }
     }
@@ -562,10 +626,13 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     }
 
     // render deferred declarations
-    const deferredDeclarations = this.declarations!.getDeferredDeclarations(
-      this.buildNamespaceFromPath(sourceFile.path),
-    );
-    for (const item of deferredDeclarations) {
+    const sfNs = this.buildNamespaceFromPath(sourceFile.path);
+    const deferredDecls = this.declarations!.get({
+      // to use root path we just append some dummy value to the end
+      rootPath: `${String(sfNs)}.DUMMY`,
+      defer: DeclarationDeferKind.Deferred,
+    });
+    for (const item of deferredDecls) {
       if (item.source?.kind === "Model") {
         const props = this.emitter.emitModelProperties(item.source);
         const modelCode = code`class ${item.name}(BaseModel):\n${props}`;
@@ -585,12 +652,21 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
 
   /** Helper method to call `emitProgram` on the underlying asset emitter. */
   emitProgram(options?: { emitTypeSpecNamespace?: boolean }): void {
-    return this.emitter.emitProgram(options);
+    this.emitter.emitProgram(options);
   }
 
   /** Helper method to get the SourceFiles from the underlying asset emitter. */
   getSourceFiles(): SourceFile<string>[] {
     return this.emitter.getSourceFiles();
+  }
+
+  /** Returns the current source file context, or undefined. */
+  getSourceFile(): SourceFile<string> | undefined {
+    const context = this.emitter.getContext();
+    if (context.scope.kind === "sourceFile") {
+      return context.scope.sourceFile;
+    }
+    return undefined;
   }
 
   /** Helper method to call writeOutput on the underlying asset emitter. */
@@ -611,62 +687,5 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   /** Helper method to call none from the underlying asset emitter. */
   skip(): NoEmit {
     return this.emitter.result.none();
-  }
-}
-
-export abstract class PythonPartialModelEmitter extends PythonPartialEmitter {
-  private fileName = "models.py";
-
-  programContext(program: Program): Context {
-    return this.createProgramContext(this.fileName);
-  }
-
-  namespaceContext(namespace: Namespace): Context {
-    return this.createNamespaceContext(namespace, this.fileName);
-  }
-}
-
-export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter {
-  private fileName = "operations.py";
-
-  programContext(program: Program): Context {
-    return this.createProgramContext(this.fileName);
-  }
-
-  namespaceContext(namespace: Namespace): Context {
-    return this.createNamespaceContext(namespace, this.fileName);
-  }
-
-  operationParameters(
-    operation: Operation,
-    parameters: Model,
-    options?: OperationParameterOptions,
-  ): EmitterOutput<string> {
-    const builder = new StringBuilder();
-    let i = 0;
-    const length = parameters.properties.size;
-    for (const param of parameters.properties.values()) {
-      const paramName = this.transformReservedName(this.toSnakeCase(param.name));
-      const paramType = this.emitter.emitTypeReference(param.type);
-      builder.push(code`${paramName}`);
-      if (options?.displayTypes ?? true) {
-        builder.push(code`: ${paramType}`);
-      }
-      if (++i < length) builder.push(code`, `);
-    }
-    return builder.reduce();
-  }
-
-  operationReturnType(operation: Operation, returnType: Type): EmitterOutput<string> {
-    const value = code`${this.emitter.emitTypeReference(operation.returnType)}`;
-    if (returnType.kind === "Model") {
-      this.imports.add(".models", returnType.name);
-    }
-    return value;
-  }
-
-  interfaceOperationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
-    const opName = `${operation.interface!.name}_${name}`;
-    return this.operationDeclaration(operation, opName);
   }
 }
