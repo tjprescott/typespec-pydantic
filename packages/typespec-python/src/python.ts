@@ -102,14 +102,24 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   }
 
   async buildInitFile(map: Map<string, SourceFile<string>>): Promise<EmittedSourceFile | undefined> {
-    let path = map.keys().next().value.split("/").slice(0, -1).join("/");
-    // createSourceFile prepends emitterOutputDir to the path, so remove it, if present.
-    const emitterOutputDir = this.emitter.getOptions().emitterOutputDir;
-    if (path.startsWith(emitterOutputDir)) {
-      path = path.substring(emitterOutputDir.length + 1);
+    // ensure that all paths have the same root path
+    const rootPaths = [...map.keys()].map((path) => path.split("/").slice(0, -1).join("/"));
+    const areAllPathsEqual = rootPaths.every((path) => path === rootPaths[0]);
+    if (!areAllPathsEqual) {
+      throw new Error("All paths must have the same root path");
     }
-    const initPath = path !== "" ? `${path}/__init__.py` : "__init__.py";
+
+    // createSourceFile prepends emitterOutputDir to the path, so remove it, if present.
+    let rootPath = rootPaths[0];
+    const emitterOutputDir = this.emitter.getOptions().emitterOutputDir;
+    if (rootPath.startsWith(emitterOutputDir)) {
+      rootPath = rootPath.substring(emitterOutputDir.length + 1);
+    }
+    const initPath = rootPath !== "" ? `${rootPath}/__init__.py` : "__init__.py";
     try {
+      // FIXME: workaround to prevent and endless loop where init files keep getting added to the collection
+      // that is being iterated upon. This has a the downside that if the __init__ file already exists, it
+      // does not get recreated, but it should!
       await this.emitter.getProgram().host.readFile(`${emitterOutputDir}/${initPath}`);
       return undefined;
     } catch (e) {
@@ -119,16 +129,17 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
       const all = new Set<string>();
       for (const [path, _] of map) {
         const importPath = this.importPathForFilePath(path);
-        if (importPath === undefined) continue;
         const decls = this.declarations?.get({
           rootPath: importPath,
         });
-        if (decls === undefined) continue;
+        if (decls === undefined || decls.length === 0) continue;
         const declNames = decls.map((decl) => decl.name);
-        if (importPath === GlobalNamespace) {
-          builder.push(`from ${decls[0].globalImportPath} import ${declNames.join(", ")}\n`);
+        const refDecl = decls[0];
+        if (refDecl.importPath === GlobalNamespace) {
+          builder.push(`from ${refDecl.globalImportPath} import ${declNames.join(", ")}\n`);
         } else {
-          builder.push(`from ${importPath} import ${declNames.join(", ")}\n`);
+          // __init__ files are special in that we need this syntax to ensure the final part is needed generally
+          builder.push(`from ${refDecl.importPath}.${refDecl.globalImportPath} import ${declNames.join(", ")}\n`);
         }
         for (const decl of declNames) {
           all.add(`"${decl}"`);

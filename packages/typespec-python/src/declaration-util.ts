@@ -97,8 +97,10 @@ export class DeclarationManager {
 
   /** Returns true of the strings are equal, ignoring the last segment. Applies only to dot-separated strings. */
   #rootsAreEqual(p1: string, p2: string): boolean {
-    const p1Root = p1.split(".").slice(0, -1).join(".");
-    const p2Root = p2.split(".").slice(0, -1).join(".");
+    let p1Root = p1.split(".").slice(0, -1).join(".");
+    let p2Root = p2.split(".").slice(0, -1).join(".");
+    p1Root = p1Root === "" ? String(GlobalNamespace) : p1Root;
+    p2Root = p2Root === "" ? String(GlobalNamespace) : p2Root;
     return p1Root === p2Root;
   }
 

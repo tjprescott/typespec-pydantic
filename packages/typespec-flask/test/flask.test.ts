@@ -280,6 +280,7 @@ describe("typespec-flask: core", () => {
       const input = `
       using TypeSpec.Http;
 
+      @service
       namespace Widgets {
         model Widget {
           @visibility("read", "update")
