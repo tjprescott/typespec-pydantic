@@ -41,6 +41,8 @@ interface UnionVariantMetadata {
   value: string | StringBuilder;
 }
 
+export const GlobalNamespace = Symbol.for("GlobalNamespace");
+
 export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   protected currNamespace: string[] = [];
 
@@ -117,12 +119,17 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
       const all = new Set<string>();
       for (const [path, _] of map) {
         const importPath = this.importPathForFilePath(path);
+        if (importPath === undefined) continue;
         const decls = this.declarations?.get({
           rootPath: importPath,
         });
         if (decls === undefined) continue;
         const declNames = decls.map((decl) => decl.name);
-        builder.push(`from ${importPath} import ${declNames.join(", ")}\n`);
+        if (importPath === GlobalNamespace) {
+          builder.push(`from ${decls[0].globalImportPath} import ${declNames.join(", ")}\n`);
+        } else {
+          builder.push(`from ${importPath} import ${declNames.join(", ")}\n`);
+        }
         for (const decl of declNames) {
           all.add(`"${decl}"`);
         }
@@ -347,32 +354,33 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   }
 
   /** Construct a fully-qualified import path string from a namespace */
-  importPathForNamespace(namespace: Namespace | undefined): string {
-    if (namespace === undefined) return this.declarations!.globalSentinel;
+  importPathForNamespace(namespace: Namespace | undefined): string | typeof GlobalNamespace {
+    if (namespace === undefined) return GlobalNamespace;
     const fullNsName = getNamespaceFullName(namespace)
       .split(".")
       .map((seg) => this.toSnakeCase(seg))
       .join(".");
-    return fullNsName === "" ? this.declarations!.globalSentinel : fullNsName;
+    return fullNsName === "" ? GlobalNamespace : fullNsName;
   }
 
   /** Construct a fully-qualified import path string from a file path */
-  importPathForFilePath(path: string | undefined): string | undefined {
+  importPathForFilePath(path: string | undefined): string | typeof GlobalNamespace | undefined {
     if (path === undefined) return undefined;
     const emitterOutputDir = this.emitter.getOptions().emitterOutputDir;
     if (path.startsWith(emitterOutputDir)) {
       path = path.substring(emitterOutputDir.length + 1);
     }
-    const val = path
+    let val = path
       .split("/")
       .map((seg) => this.toSnakeCase(seg))
       .join(".");
     // strip the final ".py"
-    return val.substring(0, val.length - 3);
+    val = val.substring(0, val.length - 3);
+    return val === "" ? GlobalNamespace : val;
   }
 
   /** Construct a fully-qualified namespace string from a TypeSpec EmitterFramework scope. */
-  buildNamespaceFromScope(dest: Scope<string>): string {
+  buildNamespaceFromScope(dest: Scope<string>): string | typeof GlobalNamespace {
     if (dest.kind !== "sourceFile") {
       throw new Error("Expected a source file");
     }
@@ -384,16 +392,17 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     if (destPath.startsWith("/")) {
       destPath = destPath.substring(1);
     }
-    return destPath.split("/").slice(0, -1).join(".");
+    destPath = destPath.split("/").slice(0, -1).join(".");
+    return destPath === "" ? GlobalNamespace : destPath;
   }
 
   /** Accepts a path and returns the fully-qualified namespace */
-  buildNamespaceFromPath(path: string): string | undefined {
+  buildNamespaceFromPath(path: string): string | typeof GlobalNamespace | undefined {
     const segments = path.split("/");
     if (segments.length > 2) {
       return segments.slice(1, -1).join(".");
     } else {
-      return this.declarations!.globalSentinel;
+      return GlobalNamespace;
     }
   }
 
@@ -540,7 +549,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
       if (type.kind === "Model") {
         const templateArgs = type.templateMapper?.args;
         if (templateArgs === undefined || templateArgs.length === 0) {
-          this.imports.add(destNs ?? "models", type.name);
+          this.imports.add(destNs === GlobalNamespace ? "models" : destNs, type.name);
         }
       }
     }
@@ -608,7 +617,8 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     // render deferred declarations
     const sfNs = this.buildNamespaceFromPath(sourceFile.path);
     const deferredDecls = this.declarations!.get({
-      rootPath: `${sfNs}.models`,
+      // to use root path we just append some dummy value to the end
+      rootPath: `${String(sfNs)}.DUMMY`,
       defer: DeclarationDeferKind.Deferred,
     });
     for (const item of deferredDecls) {

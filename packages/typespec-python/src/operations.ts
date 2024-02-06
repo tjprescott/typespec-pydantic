@@ -8,7 +8,7 @@ import {
   StringBuilder,
   code,
 } from "@typespec/compiler/emitter-framework";
-import { PythonPartialEmitter } from "./python.js";
+import { GlobalNamespace, PythonPartialEmitter } from "./python.js";
 import { Model, Namespace, Operation, Program, Type, emitFile } from "@typespec/compiler";
 import { DeclarationKind, DeclarationManager } from "./declaration-util.js";
 import { ImportKind } from "./import-util.js";
@@ -71,7 +71,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
       `${this.indent(1)}return _${pythonName}(${this.operationParameters(operation, operation.parameters, { displayTypes: false })})\n`,
     );
     const namespace = this.importPathForNamespace(operation.namespace);
-    const fullPath = namespace === undefined ? `_operations` : `${namespace}._operations`;
+    const fullPath = namespace === GlobalNamespace ? `_operations` : `${namespace}._operations`;
     this.imports.add(fullPath, `_${pythonName}`);
     return `${builder.reduce()}`;
   }
@@ -100,7 +100,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
     const namespace = this.importPathForNamespace(model.namespace);
-    const fullPath = namespace === undefined ? name : `${namespace}.${name}`;
+    const fullPath = namespace === GlobalNamespace ? name : `${namespace}.${name}`;
     const existing = this.declarations!.get({ path: fullPath })[0];
     if (!existing) {
       return this.declarations!.declare(this, {
@@ -109,6 +109,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
         kind: DeclarationKind.Model,
         value: undefined,
         omit: true,
+        globalImportPath: "models",
       });
     }
     return existing.decl ?? this.emitter.result.none();
@@ -124,8 +125,10 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
       kind: DeclarationKind.Operation,
       value: interfaceValue,
       omit: false,
+      globalImportPath: "operations",
     });
-    const path = `${this.buildNamespaceFromScope(decl.scope)}.${pythonName}`;
+    const opNs = this.buildNamespaceFromScope(decl.scope);
+    const path = `${String(opNs)}.${pythonName}`;
     this.operationMetadata.set(path, { interface: interfaceValue, implementation: implementationValue });
     return decl;
   }
@@ -143,7 +146,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
       const paramType = this.emitter.emitTypeReference(param.type);
       if (param.type.kind === "Model" && param.type.name !== "Array") {
         const modelPath = this.importPathForNamespace(param.type.namespace);
-        this.imports.add(modelPath ?? "models", param.type.name);
+        this.imports.add(modelPath === GlobalNamespace ? "models" : modelPath, param.type.name);
       }
       builder.push(code`${paramName}`);
       if (options?.displayTypes ?? true) {
@@ -158,7 +161,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
     const value = code`${this.emitter.emitTypeReference(operation.returnType)}`;
     if (returnType.kind === "Model" && returnType.name !== "Array") {
       const modelPath = this.importPathForNamespace(returnType.namespace);
-      this.imports.add(modelPath ?? "models", returnType.name);
+      this.imports.add(modelPath === GlobalNamespace ? "models" : modelPath, returnType.name);
     }
     return value;
   }
@@ -203,7 +206,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
         builder.push("\n");
       }
       for (const [path, meta] of this.operationMetadata.entries()) {
-        if (this.#rootsAreEqual(path, importPath)) {
+        if (this.#rootsAreEqual(path, String(importPath))) {
           builder.push(`${meta.implementation}\n`);
         }
       }
@@ -217,7 +220,7 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
     if (destNs !== "type_spec" && type.kind === "Model") {
       const templateArgs = type.templateMapper?.args;
       if (templateArgs === undefined || templateArgs.length === 0) {
-        this.imports.add(destNs ?? "models", type.name);
+        this.imports.add(destNs === GlobalNamespace ? "models" : destNs, type.name);
       }
     }
     const value = this.emitter.emitTypeReference(type);

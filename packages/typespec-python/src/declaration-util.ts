@@ -1,5 +1,5 @@
 import { Declaration, SourceFile, StringBuilder } from "@typespec/compiler/emitter-framework";
-import { PythonPartialEmitter } from "./python.js";
+import { GlobalNamespace, PythonPartialEmitter } from "./python.js";
 import { Model, Namespace, Scalar } from "@typespec/compiler";
 
 export enum DeclarationKind {
@@ -17,19 +17,22 @@ export interface DeclarationFilters {
   kind?: DeclarationKind;
   defer?: DeclarationDeferKind;
   path?: string;
-  rootPath?: string;
+  rootPath?: string | typeof GlobalNamespace;
   sourceFile?: SourceFile<string>;
 }
 
 export interface DeclarationMetadata {
   name: string;
   kind: DeclarationKind;
-  importPath: string | undefined;
+  /** The import path to use when the declaration is in a TypeSpec namespace, or a sentinel that the declaration is in the global namespace. */
+  importPath: string | typeof GlobalNamespace;
   decl?: Declaration<string>;
   omit: boolean;
   deferred: DeclarationDeferKind;
   source?: Model | Scalar;
   sourceFile?: SourceFile<string> | undefined;
+  /** The import path to use if the declaration is in the global namespace */
+  globalImportPath: string;
 }
 
 export interface DeclarationOptions {
@@ -39,6 +42,8 @@ export interface DeclarationOptions {
   value?: string | StringBuilder;
   omit: boolean;
   sourceFile?: SourceFile<string>;
+  /** The import path to use if the declaration is in the global namespace */
+  globalImportPath: string;
 }
 
 export interface DeferredDeclarationOptions {
@@ -46,19 +51,19 @@ export interface DeferredDeclarationOptions {
   kind: DeclarationKind;
   source: Model | Scalar;
   omit: boolean;
+  /** The import path to use if the declaration is in the global namespace */
+  globalImportPath: string;
 }
 
 export class DeclarationManager {
-  private declarations = new Map<string, DeclarationMetadata>();
-
-  public readonly globalSentinel = "_GLOBAL_";
+  private declarations = new Map<string | typeof GlobalNamespace, DeclarationMetadata>();
 
   declare(emitter: PythonPartialEmitter, options: DeclarationOptions): Declaration<string> {
     const sf = options.sourceFile ?? emitter.getSourceFile();
     const decl = emitter.declaration(options.name, options.value ?? "");
     decl.meta["omit"] = options.omit;
     const importPath = emitter.importPathForNamespace(options.namespace);
-    const declarationKey = importPath === undefined ? options.name : `${importPath}.${options.name}`;
+    const declarationKey = `${String(importPath)}.${options.name}`;
     this.declarations.set(declarationKey, {
       name: options.name,
       kind: options.kind,
@@ -68,13 +73,15 @@ export class DeclarationManager {
       deferred: DeclarationDeferKind.NotDeferred,
       source: undefined,
       sourceFile: sf,
+      globalImportPath: options.globalImportPath,
     });
     return decl;
   }
 
   defer(path: string, options: DeferredDeclarationOptions) {
-    const declarationKey = path;
-    const importPath = path.split(".").slice(0, -1).join(".");
+    const shortPath = path.split(".").slice(0, -1).join(".");
+    const importPath = shortPath === "" ? GlobalNamespace : shortPath;
+    const declarationKey = `${String(importPath)}.${options.name}`;
     this.declarations.set(declarationKey, {
       name: options.name,
       kind: options.kind,
@@ -84,6 +91,7 @@ export class DeclarationManager {
       deferred: DeclarationDeferKind.Deferred,
       source: options.source,
       sourceFile: undefined,
+      globalImportPath: options.globalImportPath,
     });
   }
 
@@ -102,14 +110,14 @@ export class DeclarationManager {
       if (opts.kind !== undefined && val.kind !== opts.kind) continue;
       if (opts.defer !== undefined && val.deferred !== opts.defer) continue;
       if (opts.path !== undefined && key !== opts.path) continue;
-      if (opts.rootPath !== undefined && !this.#rootsAreEqual(key, opts.rootPath)) continue;
+      if (opts.rootPath !== undefined && !this.#rootsAreEqual(String(key), String(opts.rootPath))) continue;
       if (opts.sourceFile !== undefined && val.sourceFile !== opts.sourceFile) continue;
       decls.push(val);
     }
     return decls;
   }
 
-  has(name: string): boolean {
-    return this.declarations.has(name);
+  has(key: string | typeof GlobalNamespace): boolean {
+    return this.declarations.has(key);
   }
 }
