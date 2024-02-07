@@ -11,7 +11,7 @@ words:
   - repr
   - regen
   - keyer
-  - intern
+  - Interner
 ignorePaths:
   - "**/node_modules/**"
   - "**/dist/**"

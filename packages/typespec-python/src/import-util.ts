@@ -58,15 +58,14 @@ export class ImportManager {
     // strip double quotes from the name, if present
     name = name.replace(/^"(.*)"$/, "$1");
     if (sourceFile === undefined) {
-      const context = this.emitter.getContext();
-      if (context.scope.kind === "sourceFile") {
-        sourceFile = context.scope.sourceFile;
-      } else {
-        throw new Error("Expected source file scope");
+      const scope = this.emitter.getContext().scope;
+      if (scope !== undefined && scope.kind === "sourceFile") {
+        sourceFile = scope.sourceFile;
       }
     }
+    // attempt to resolve source file. If unsuccessful, do nothing
     if (sourceFile === undefined) {
-      throw new Error("Expected source file");
+      return;
     }
 
     if (kind === ImportKind.deferred && this.has(sourceFile, module, name, ImportKind.regular)) {

@@ -45,7 +45,7 @@
     "typespec-python": "workspace:~1.0.0-beta.1"
   },
   "peerDependencies": {
-    "@typespec/compiler": "^0.51.0"
+    "@typespec/compiler": "^0.52.0"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",

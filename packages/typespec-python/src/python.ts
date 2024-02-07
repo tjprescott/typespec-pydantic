@@ -659,9 +659,9 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
 
   /** Returns the current source file context, or undefined. */
   getSourceFile(): SourceFile<string> | undefined {
-    const context = this.emitter.getContext();
-    if (context.scope.kind === "sourceFile") {
-      return context.scope.sourceFile;
+    const scope = this.emitter.getContext().scope;
+    if (scope !== undefined && scope.kind === "sourceFile") {
+      return scope.sourceFile;
     }
     return undefined;
   }

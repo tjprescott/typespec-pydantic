@@ -30,7 +30,6 @@ const config = defineConfig(
       },
     },
     links: {
-      githubIssueUrl: `${githubUrl}/issues`,
       documentationUrl: `${githubUrl}/blob/master/README.md`,
     },
   }),
