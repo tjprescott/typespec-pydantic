@@ -242,17 +242,17 @@ describe("typespec-pydantic: core", () => {
       const widgetsExpect = `
         from pydantic import BaseModel
 
-        class IntWidget(BaseModel):
-            contents: int
-            
         class WidgetString(BaseModel):
-            contents: str`;
+            contents: str
+
+        class IntWidget(BaseModel):
+            contents: int`;
       const partsExpect = `
         from pydantic import BaseModel
         from widgets import WidgetString
 
         class WidgetPart(BaseModel):
-            widget: "WidgetString"
+            widget: WidgetString
         `;
       const widgetInitExpect = `
         from widgets.models import WidgetString, IntWidget
@@ -718,11 +718,11 @@ describe("typespec-pydantic: core", () => {
             widget: Widget<string>;
         };`;
       const expect = `
-        class WidgetPart(BaseModel):
-            widget: "WidgetString"
+      class WidgetString(BaseModel):
+          contents: str
 
-        class WidgetString(BaseModel):
-            contents: str`;
+      class WidgetPart(BaseModel):
+          widget: WidgetString`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result[0].contents);
@@ -1133,6 +1133,23 @@ describe("typespec-pydantic: core", () => {
         class WidgetShape(Enum):
             SQUARE = Field(default="square", frozen=True)
             CIRCLE = Field(default="circle", frozen=True)`;
+      const [result, diagnostics] = await pydanticOutputFor(input);
+      expectDiagnosticEmpty(diagnostics);
+      compare(expect, result[0].contents);
+    });
+
+    it("supports anonymous template instantiations", async () => {
+      const input = `
+        scalar Test<T> extends uint8;
+
+        model WidgetPart {
+            widget: Test<string>;
+        };`;
+      const expect = `
+      TestString = Annotated[Decimal, Field()]
+
+      class WidgetPart(BaseModel):
+          widget: TestString`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result[0].contents);

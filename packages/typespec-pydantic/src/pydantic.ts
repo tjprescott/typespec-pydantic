@@ -313,6 +313,20 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     return code`object`;
   }
 
+  #codeForType(
+    name: string,
+    type: Model | Scalar,
+    sourceFile?: SourceFile<string>,
+  ): string | StringBuilder | undefined {
+    if (type.kind === "Model") {
+      const props = this.emitter.emitModelProperties(type);
+      return code`class ${name}(BaseModel):\n${props}\n`;
+    } else if (type.kind === "Scalar") {
+      return this.emitScalar(type, name, sourceFile) + "\n";
+    }
+    return undefined;
+  }
+
   modelInstantiation(model: Model, name: string | undefined): EmitterOutput<string> {
     if (model.name === "Record") {
       const type = model.templateMapper?.args[0];
@@ -325,14 +339,15 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
       if (this.declarations!.has(fullPath)) {
         return code`${modelName}`;
       } else {
-        this.declarations!.defer(fullPath, {
+        const code = this.#codeForType(modelName, model);
+        return this.declarations!.declare(this, {
           name: modelName,
+          namespace: model.namespace,
           kind: DeclarationKind.Model,
-          source: model,
+          value: code,
           omit: false,
           globalImportPath: "models",
         });
-        return code`"${modelName}"`;
       }
     }
   }
