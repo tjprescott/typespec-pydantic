@@ -7,15 +7,9 @@ export enum DeclarationKind {
   Operation,
 }
 
-export enum DeclarationDeferKind {
-  NotDeferred,
-  Deferred,
-}
-
 /** Filters for retrieving declarations. Any defined properties are treated with AND logic. */
 export interface DeclarationFilters {
   kind?: DeclarationKind;
-  defer?: DeclarationDeferKind;
   path?: string;
   rootPath?: string | typeof GlobalNamespace;
   sourceFile?: SourceFile<string>;
@@ -28,7 +22,6 @@ export interface DeclarationMetadata {
   importPath: string | typeof GlobalNamespace;
   decl?: Declaration<string>;
   omit: boolean;
-  deferred: DeclarationDeferKind;
   source?: Model | Scalar;
   sourceFile?: SourceFile<string> | undefined;
   /** The import path to use if the declaration is in the global namespace */
@@ -42,15 +35,6 @@ export interface DeclarationOptions {
   value?: string | StringBuilder;
   omit: boolean;
   sourceFile?: SourceFile<string>;
-  /** The import path to use if the declaration is in the global namespace */
-  globalImportPath: string;
-}
-
-export interface DeferredDeclarationOptions {
-  name: string;
-  kind: DeclarationKind;
-  source: Model | Scalar;
-  omit: boolean;
   /** The import path to use if the declaration is in the global namespace */
   globalImportPath: string;
 }
@@ -70,29 +54,11 @@ export class DeclarationManager {
       importPath: importPath,
       decl: decl,
       omit: options.omit,
-      deferred: DeclarationDeferKind.NotDeferred,
       source: undefined,
       sourceFile: sf,
       globalImportPath: options.globalImportPath,
     });
     return decl;
-  }
-
-  defer(path: string, options: DeferredDeclarationOptions) {
-    const shortPath = path.split(".").slice(0, -1).join(".");
-    const importPath = shortPath === "" ? GlobalNamespace : shortPath;
-    const declarationKey = `${String(importPath)}.${options.name}`;
-    this.declarations.set(declarationKey, {
-      name: options.name,
-      kind: options.kind,
-      importPath: importPath,
-      decl: undefined,
-      omit: options.omit,
-      deferred: DeclarationDeferKind.Deferred,
-      source: options.source,
-      sourceFile: undefined,
-      globalImportPath: options.globalImportPath,
-    });
   }
 
   /** Returns true of the strings are equal, ignoring the last segment. Applies only to dot-separated strings. */
@@ -110,7 +76,6 @@ export class DeclarationManager {
       // never return omitted declarations. These are needed only for the emitter framework.
       if (val.omit) continue;
       if (opts.kind !== undefined && val.kind !== opts.kind) continue;
-      if (opts.defer !== undefined && val.deferred !== opts.defer) continue;
       if (opts.path !== undefined && key !== opts.path) continue;
       if (opts.rootPath !== undefined && !this.#rootsAreEqual(String(key), String(opts.rootPath))) continue;
       if (opts.sourceFile !== undefined && val.sourceFile !== opts.sourceFile) continue;

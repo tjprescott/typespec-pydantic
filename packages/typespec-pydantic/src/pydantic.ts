@@ -4,7 +4,6 @@ import {
   DeclarationKind,
   PythonPartialModelEmitter,
   createEmitters,
-  DeclarationDeferKind,
   GlobalNamespace,
 } from "typespec-python";
 import {
@@ -248,24 +247,6 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     return builder;
   }
 
-  sourceFile(sourceFile: SourceFile<string>): EmittedSourceFile | Promise<EmittedSourceFile> {
-    const sfNs = this.buildNamespaceFromPath(sourceFile.path);
-    if (sfNs === undefined) throw new Error(`Namespace for source file ${sourceFile.path} is undefined`);
-
-    // if any deferred declaration is a model, import Pydantic BaseModel
-    const deferredDecls = this.declarations!.get({
-      rootPath: sfNs === GlobalNamespace ? `models` : `${sfNs}.models`,
-      defer: DeclarationDeferKind.Deferred,
-    });
-    for (const item of deferredDecls) {
-      if (item.source?.kind === "Model") {
-        this.imports.add("pydantic", "BaseModel", ImportKind.regular, sourceFile);
-        break;
-      }
-    }
-    return super.sourceFile(sourceFile);
-  }
-
   circularReference(
     target: EmitEntity<string>,
     scope: Scope<string> | undefined,
@@ -313,11 +294,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     return code`object`;
   }
 
-  #codeForType(
-    name: string,
-    type: Model | Scalar,
-    sourceFile?: SourceFile<string>,
-  ): string | StringBuilder | undefined {
+  #emitType(name: string, type: Model | Scalar, sourceFile?: SourceFile<string>): string | StringBuilder | undefined {
     if (type.kind === "Model") {
       const props = this.emitter.emitModelProperties(type);
       return code`class ${name}(BaseModel):\n${props}\n`;
@@ -339,7 +316,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
       if (this.declarations!.has(fullPath)) {
         return code`${modelName}`;
       } else {
-        const code = this.#codeForType(modelName, model);
+        const code = this.#emitType(modelName, model);
         return this.declarations!.declare(this, {
           name: modelName,
           namespace: model.namespace,
@@ -515,14 +492,15 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     if (this.declarations!.has(fullPath)) {
       return code`${converted}`;
     } else {
-      this.declarations!.defer(fullPath, {
+      const code = this.#emitType(converted, scalar);
+      return this.declarations!.declare(this, {
         name: converted,
+        namespace: scalar.namespace,
         kind: DeclarationKind.Model,
-        source: scalar,
+        value: code,
         omit: false,
         globalImportPath: "models",
       });
-      return code`"${converted}"`;
     }
   }
 

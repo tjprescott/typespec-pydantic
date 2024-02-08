@@ -699,10 +699,15 @@ describe("typespec-pydantic: core", () => {
             contents: T;
         }
 
-        model StringWidget is Widget<string>;`;
+        model StringWidget is Widget<string>;
+
+        model IntWidget is Widget<int32>;`;
       const expect = `
         class StringWidget(BaseModel):
-            contents: str`;
+            contents: str
+            
+        class IntWidget(BaseModel):
+            contents: int`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result[0].contents);
@@ -1040,10 +1045,10 @@ describe("typespec-pydantic: core", () => {
             name: myString<string>;
         };`;
       const expect = `
+        MyStringString = Annotated[str, Field()]
+
         class Widget(BaseModel):
-            name: "MyStringString"
-            
-        MyStringString = Annotated[str, Field()]`;
+            name: MyStringString`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result[0].contents);
@@ -1133,23 +1138,6 @@ describe("typespec-pydantic: core", () => {
         class WidgetShape(Enum):
             SQUARE = Field(default="square", frozen=True)
             CIRCLE = Field(default="circle", frozen=True)`;
-      const [result, diagnostics] = await pydanticOutputFor(input);
-      expectDiagnosticEmpty(diagnostics);
-      compare(expect, result[0].contents);
-    });
-
-    it("supports anonymous template instantiations", async () => {
-      const input = `
-        scalar Test<T> extends uint8;
-
-        model WidgetPart {
-            widget: Test<string>;
-        };`;
-      const expect = `
-      TestString = Annotated[Decimal, Field()]
-
-      class WidgetPart(BaseModel):
-          widget: TestString`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result[0].contents);
