@@ -102,7 +102,9 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
     const namespace = this.importPathForNamespace(model.namespace);
     const fullPath = namespace === GlobalNamespace ? name : `${namespace}.${name}`;
     const existing = this.declarations!.get({ path: fullPath })[0];
-    if (!existing) {
+    if (existing) {
+      return existing.decl ?? this.emitter.result.none();
+    } else {
       return this.declarations!.declare(this, {
         name: name,
         namespace: model.namespace,
@@ -112,7 +114,6 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
         globalImportPath: "models",
       });
     }
-    return existing.decl ?? this.emitter.result.none();
   }
 
   operationDeclaration(operation: Operation, name: string): EmitterOutput<string> {

@@ -33,7 +33,7 @@ import {
   code,
 } from "@typespec/compiler/emitter-framework";
 import { ImportManager, ImportKind } from "./import-util.js";
-import { DeclarationDeferKind, DeclarationKind, DeclarationManager } from "./declaration-util.js";
+import { DeclarationKind, DeclarationManager } from "./declaration-util.js";
 import { reportDiagnostic } from "./lib.js";
 
 interface UnionVariantMetadata {
@@ -620,24 +620,6 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     for (const decl of sourceFile.globalScope.declarations) {
       if (decl.value === undefined || decl.value === "") continue;
       emittedSourceFile.contents += decl.value + "\n";
-    }
-
-    // render deferred declarations
-    const sfNs = this.buildNamespaceFromPath(sourceFile.path);
-    const deferredDecls = this.declarations!.get({
-      // to use root path we just append some dummy value to the end
-      rootPath: `${String(sfNs)}.DUMMY`,
-      defer: DeclarationDeferKind.Deferred,
-    });
-    for (const item of deferredDecls) {
-      if (item.source?.kind === "Model") {
-        const props = this.emitter.emitModelProperties(item.source);
-        const modelCode = code`class ${item.name}(BaseModel):\n${props}`;
-        emittedSourceFile.contents += modelCode + "\n\n";
-      } else if (item.source?.kind === "Scalar") {
-        const scalarCode = this.emitScalar(item.source, item.name, sourceFile);
-        emittedSourceFile.contents += scalarCode + "\n\n";
-      }
     }
     return emittedSourceFile;
   }

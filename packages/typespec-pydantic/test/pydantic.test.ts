@@ -242,17 +242,17 @@ describe("typespec-pydantic: core", () => {
       const widgetsExpect = `
         from pydantic import BaseModel
 
-        class IntWidget(BaseModel):
-            contents: int
-            
         class WidgetString(BaseModel):
-            contents: str`;
+            contents: str
+
+        class IntWidget(BaseModel):
+            contents: int`;
       const partsExpect = `
         from pydantic import BaseModel
         from widgets import WidgetString
 
         class WidgetPart(BaseModel):
-            widget: "WidgetString"
+            widget: WidgetString
         `;
       const widgetInitExpect = `
         from widgets.models import WidgetString, IntWidget
@@ -699,10 +699,15 @@ describe("typespec-pydantic: core", () => {
             contents: T;
         }
 
-        model StringWidget is Widget<string>;`;
+        model StringWidget is Widget<string>;
+
+        model IntWidget is Widget<int32>;`;
       const expect = `
         class StringWidget(BaseModel):
-            contents: str`;
+            contents: str
+            
+        class IntWidget(BaseModel):
+            contents: int`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result[0].contents);
@@ -718,11 +723,11 @@ describe("typespec-pydantic: core", () => {
             widget: Widget<string>;
         };`;
       const expect = `
-        class WidgetPart(BaseModel):
-            widget: "WidgetString"
+      class WidgetString(BaseModel):
+          contents: str
 
-        class WidgetString(BaseModel):
-            contents: str`;
+      class WidgetPart(BaseModel):
+          widget: WidgetString`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result[0].contents);
@@ -1040,10 +1045,10 @@ describe("typespec-pydantic: core", () => {
             name: myString<string>;
         };`;
       const expect = `
+        MyStringString = Annotated[str, Field()]
+
         class Widget(BaseModel):
-            name: "MyStringString"
-            
-        MyStringString = Annotated[str, Field()]`;
+            name: MyStringString`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result[0].contents);
