@@ -30,7 +30,6 @@ import {
 } from "@typespec/compiler";
 import {
   EmitEntity,
-  EmittedSourceFile,
   EmitterOutput,
   Placeholder,
   ReferenceCycle,
@@ -311,21 +310,15 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
       return code`Dict[str, ${type ? this.emitTypeReference(type) : "None"}]`;
     } else {
       const modelName = this.transformReservedName(name ?? model.name);
-      const namespace = this.importPathForNamespace(model.namespace) ?? "";
-      const fullPath = `${String(namespace)}.${modelName}`;
-      if (this.declarations!.has(fullPath)) {
-        return code`${modelName}`;
-      } else {
-        const code = this.#emitType(modelName, model);
-        return this.declarations!.declare(this, {
-          name: modelName,
-          namespace: model.namespace,
-          kind: DeclarationKind.Model,
-          value: code,
-          omit: false,
-          globalImportPath: "models",
-        });
-      }
+      const code = this.#emitType(modelName, model);
+      return this.declarations!.declare(this, {
+        name: modelName,
+        namespace: model.namespace,
+        kind: DeclarationKind.Model,
+        value: code,
+        omit: false,
+        globalImportPath: "models",
+      });
     }
   }
 
@@ -487,21 +480,15 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
 
   scalarInstantiation(scalar: Scalar, name: string | undefined): EmitterOutput<string> {
     const converted = this.convertScalarName(scalar, name);
-    const namespace = this.importPathForNamespace(scalar.namespace);
-    const fullPath = `${String(namespace)}.${converted}`;
-    if (this.declarations!.has(fullPath)) {
-      return code`${converted}`;
-    } else {
-      const code = this.#emitType(converted, scalar);
-      return this.declarations!.declare(this, {
-        name: converted,
-        namespace: scalar.namespace,
-        kind: DeclarationKind.Model,
-        value: code,
-        omit: false,
-        globalImportPath: "models",
-      });
-    }
+    const code = this.#emitType(converted, scalar);
+    return this.declarations!.declare(this, {
+      name: converted,
+      namespace: scalar.namespace,
+      kind: DeclarationKind.Model,
+      value: code,
+      omit: false,
+      globalImportPath: "models",
+    });
   }
 
   unionDeclaration(union: Union, name: string): EmitterOutput<string> {
