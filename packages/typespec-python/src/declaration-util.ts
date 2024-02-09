@@ -83,8 +83,4 @@ export class DeclarationManager {
     }
     return decls;
   }
-
-  has(key: string | typeof GlobalNamespace): boolean {
-    return this.declarations.has(key);
-  }
 }

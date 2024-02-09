@@ -125,10 +125,9 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
       const initSf = await this.emitter.emitSourceFile(initFile);
       const builder = new StringBuilder();
       const all = new Set<string>();
-      for (const [path, _] of map) {
-        const importPath = this.importPathForFilePath(path);
+      for (const [path, sf] of map) {
         const decls = this.declarations?.get({
-          rootPath: importPath,
+          sourceFile: sf,
         });
         if (decls === undefined || decls.length === 0) continue;
         const declNames = decls.map((decl) => decl.name);

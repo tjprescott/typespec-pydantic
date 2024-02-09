@@ -721,12 +721,19 @@ describe("typespec-pydantic: core", () => {
 
         model WidgetPart {
             widget: Widget<string>;
-        };`;
+        }
+        
+        model Foo {
+          widget: Widget<string>;
+        }`;
       const expect = `
       class WidgetString(BaseModel):
           contents: str
 
       class WidgetPart(BaseModel):
+          widget: WidgetString
+
+      class Foo(BaseModel):
           widget: WidgetString`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -1043,11 +1050,18 @@ describe("typespec-pydantic: core", () => {
 
         model Widget {
             name: myString<string>;
-        };`;
+        }
+        
+        model Foo {
+          name: myString<string>;
+        }`;
       const expect = `
         MyStringString = Annotated[str, Field()]
 
         class Widget(BaseModel):
+            name: MyStringString
+
+        class Foo(BaseModel):
             name: MyStringString`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
