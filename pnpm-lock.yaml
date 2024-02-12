@@ -206,6 +206,70 @@ importers:
         specifier: ^5.3.3
         version: 5.3.3
 
+  packages/typespec-django:
+    dependencies:
+      '@typespec/compiler':
+        specifier: ^0.52.0
+        version: 0.52.0
+      '@typespec/http':
+        specifier: ^0.52.0
+        version: 0.52.1(@typespec/compiler@0.52.0)
+      '@typespec/rest':
+        specifier: ^0.52.0
+        version: 0.52.0(@typespec/compiler@0.52.0)(@typespec/http@0.52.1)
+      typespec-python:
+        specifier: workspace:~1.0.0-beta.1
+        version: link:../typespec-python
+    devDependencies:
+      '@changesets/cli':
+        specifier: ^2.27.1
+        version: 2.27.1
+      '@types/mocha':
+        specifier: ~10.0.1
+        version: 10.0.6
+      '@types/node':
+        specifier: ~18.11.9
+        version: 18.11.19
+      '@typespec/eslint-config-typespec':
+        specifier: ~0.50.0
+        version: 0.50.0(prettier@3.2.5)
+      '@typespec/prettier-plugin-typespec':
+        specifier: ~0.50.0
+        version: 0.50.0
+      cspell:
+        specifier: ^7.3.9
+        version: 7.3.9
+      eslint:
+        specifier: ^8.55.0
+        version: 8.56.0
+      eslint-plugin-import:
+        specifier: ^2.29.0
+        version: 2.29.1(@typescript-eslint/parser@6.21.0)(eslint@8.56.0)
+      mocha:
+        specifier: ~10.2.0
+        version: 10.2.0
+      prettier:
+        specifier: ^3.1.1
+        version: 3.2.5
+      rimraf:
+        specifier: ^5.0.5
+        version: 5.0.5
+      source-map-support:
+        specifier: ^0.5.21
+        version: 0.5.21
+      syncpack:
+        specifier: ^11.2.1
+        version: 11.2.1
+      ts-mocha:
+        specifier: ^10.0.0
+        version: 10.0.0(mocha@10.2.0)
+      ts-node:
+        specifier: 10.9.2
+        version: 10.9.2(@types/node@18.11.19)(typescript@5.3.3)
+      typescript:
+        specifier: ^5.3.3
+        version: 5.3.3
+
   packages/typespec-flask:
     dependencies:
       '@typespec/compiler':
@@ -4579,7 +4643,7 @@ packages:
   /builtins@5.0.1:
     resolution: {integrity: sha512-qwVpFEHNfhYJIzNRBvd2C1kyo6jz3ZSMPyyuR47OPdiKWlbYnZNyDWuyR175qDnAJLiCo5fBBqPb3RiXgWlkOQ==}
     dependencies:
-      semver: 7.5.4
+      semver: 7.6.0
     dev: true
 
   /c8@8.0.1:
@@ -7165,7 +7229,7 @@ packages:
     dependencies:
       hosted-git-info: 6.1.1
       proc-log: 3.0.0
-      semver: 7.5.4
+      semver: 7.6.0
       validate-npm-package-name: 5.0.0
     dev: true
 
