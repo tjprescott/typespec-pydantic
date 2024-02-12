@@ -616,9 +616,9 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
       contents: builder.reduce() + `${preamble}\n`,
     };
 
-    for (const decl of sourceFile.globalScope.declarations) {
-      if (decl.value === undefined || decl.value === "") continue;
-      emittedSourceFile.contents += decl.value + "\n";
+    for (const decl of this.declarations!.get({ sourceFile: sourceFile })) {
+      if (decl.decl === undefined || decl.decl.value === "") continue;
+      emittedSourceFile.contents += decl.decl.value + "\n";
     }
     return emittedSourceFile;
   }
