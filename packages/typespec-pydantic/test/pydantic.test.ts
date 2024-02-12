@@ -1083,13 +1083,13 @@ describe("typespec-pydantic: core", () => {
         class Widget(BaseModel):
             name: MyString`;
       const initExpect = `
-        from models import Widget, MyString
+        from models import MyString, Widget
 
-        __all__ = ["Widget", "MyString"]`;
+        __all__ = ["MyString", "Widget"]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(contentExpect, result[0].contents);
-      compare(initExpect, result[1].contents);
+      compare(initExpect, result[1].contents, false);
     });
 
     it("translates TypeSpec scalars to Python types", async () => {

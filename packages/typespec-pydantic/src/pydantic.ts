@@ -475,7 +475,14 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
         return code`${converted}`;
       }
     }
-    return this.emitter.result.declaration(converted, this.emitScalar(scalar, converted));
+    return this.declarations!.declare(this, {
+      name: converted,
+      namespace: scalar.namespace,
+      kind: DeclarationKind.Model,
+      value: code`${this.emitScalar(scalar, converted)}`,
+      omit: false,
+      globalImportPath: "models",
+    });
   }
 
   scalarInstantiation(scalar: Scalar, name: string | undefined): EmitterOutput<string> {
