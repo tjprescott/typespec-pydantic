@@ -1077,14 +1077,19 @@ describe("typespec-pydantic: core", () => {
         model Widget {
             name: my_string;
         }`;
-      const expect = `
+      const contentExpect = `
         MyString = Annotated[str, Field(description="My custom string", min_length=1)]
  
         class Widget(BaseModel):
             name: MyString`;
+      const initExpect = `
+        from models import MyString, Widget
+
+        __all__ = ["MyString", "Widget"]`;
       const [result, diagnostics] = await pydanticOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result[0].contents);
+      compare(contentExpect, result[0].contents);
+      compare(initExpect, result[1].contents, false);
     });
 
     it("translates TypeSpec scalars to Python types", async () => {

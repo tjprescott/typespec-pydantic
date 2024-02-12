@@ -114,42 +114,38 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
       rootPath = rootPath.substring(emitterOutputDir.length + 1);
     }
     const initPath = rootPath !== "" ? `${rootPath}/__init__.py` : "__init__.py";
-    try {
-      // FIXME: workaround to prevent and endless loop where init files keep getting added to the collection
-      // that is being iterated upon. This has a the downside that if the __init__ file already exists, it
-      // does not get recreated, but it should!
-      await this.emitter.getProgram().host.readFile(`${emitterOutputDir}/${initPath}`);
-      return undefined;
-    } catch (e) {
-      const initFile = this.emitter.createSourceFile(initPath);
-      const initSf = await this.emitter.emitSourceFile(initFile);
-      const builder = new StringBuilder();
-      const all = new Set<string>();
-      for (const [path, sf] of map) {
-        const decls = this.declarations?.get({
-          sourceFile: sf,
-        });
-        if (decls === undefined || decls.length === 0) continue;
-        const declNames = decls.map((decl) => decl.name);
-        const refDecl = decls[0];
-        if (refDecl.importPath === GlobalNamespace) {
-          builder.push(`from ${refDecl.globalImportPath} import ${declNames.join(", ")}\n`);
-        } else {
-          // __init__ files are special in that we need this syntax to ensure the final part is needed generally
-          builder.push(`from ${refDecl.importPath}.${refDecl.globalImportPath} import ${declNames.join(", ")}\n`);
-        }
-        for (const decl of declNames) {
-          all.add(`"${decl}"`);
-        }
-      }
-      if (all.size > 0) {
-        builder.push(`\n__all__ = [${[...all].join(", ")}]`);
-        initSf.contents = builder.reduce() + "\n";
+
+    const initFile = this.emitter.createSourceFile(initPath);
+    const initSf = await this.emitter.emitSourceFile(initFile);
+    const builder = new StringBuilder();
+    const all = new Set<string>();
+
+    // create a shallow copy of the map to avoid modifying the original
+    const sourceFiles = [...map.values()];
+    for (const sf of sourceFiles) {
+      const decls = this.declarations?.get({
+        sourceFile: sf,
+      });
+      if (decls === undefined || decls.length === 0) continue;
+      const declNames = decls.map((decl) => decl.name);
+      const refDecl = decls[0];
+      if (refDecl.importPath === GlobalNamespace) {
+        builder.push(`from ${refDecl.globalImportPath} import ${declNames.join(", ")}\n`);
       } else {
-        initSf.contents = "";
+        // __init__ files are special in that we need this syntax to ensure the final part is needed generally
+        builder.push(`from ${refDecl.importPath}.${refDecl.globalImportPath} import ${declNames.join(", ")}\n`);
       }
-      return initSf;
+      for (const decl of declNames) {
+        all.add(`"${decl}"`);
+      }
     }
+    if (all.size > 0) {
+      builder.push(`\n__all__ = [${[...all].join(", ")}]`);
+      initSf.contents = builder.reduce() + "\n";
+    } else {
+      initSf.contents = "";
+    }
+    return initSf;
   }
 
   /** Constructs a file system path for a given namespace. If a fileName is provided,
@@ -633,9 +629,11 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     this.emitter.emitProgram(options);
   }
 
-  /** Helper method to get the SourceFiles from the underlying asset emitter. */
+  /** Helper method to get the SourceFiles from the underlying asset emitter. Returns
+   * a shallow copy of the SourceFiles array to prevent mutation.
+   */
   getSourceFiles(): SourceFile<string>[] {
-    return this.emitter.getSourceFiles();
+    return [...this.emitter.getSourceFiles()];
   }
 
   /** Returns the current source file context, or undefined. */

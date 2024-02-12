@@ -184,16 +184,17 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
   async buildImplementationFile(sourceFile: SourceFile<string>): Promise<EmittedSourceFile | undefined> {
     const pathRoot = sourceFile.path.split("/").slice(0, -1).join("/");
     let path = `${pathRoot}/_operations.py`;
-    // createSourceFile prepends emitterOutputDir to the path, so remove it, if present.
-    const emitterOutputDir = this.emitter.getOptions().emitterOutputDir;
-    if (path.startsWith(emitterOutputDir)) {
-      path = path.substring(emitterOutputDir.length + 1);
-    }
     try {
       // check if path already exists. If so, return undefined.
       await this.emitter.getProgram().host.readFile(path);
       return undefined;
     } catch (e) {
+      // createSourceFile prepends emitterOutputDir to the path, so remove it, if present.
+      const emitterOutputDir = this.emitter.getOptions().emitterOutputDir;
+      if (path.startsWith(emitterOutputDir)) {
+        path = path.substring(emitterOutputDir.length + 1);
+      }
+
       // file does not exist, so we can create it
       const implFile = this.emitter.createSourceFile(path);
       const implSf = await this.emitter.emitSourceFile(implFile);
