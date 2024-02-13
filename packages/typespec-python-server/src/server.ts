@@ -1,6 +1,5 @@
 import { EmitContext, Scalar, emitFile } from "@typespec/compiler";
 import { AssetEmitter, Placeholder, SourceFile } from "@typespec/compiler/emitter-framework";
-import { PydanticEmitter } from "typespec-pydantic";
 import {
   DeclarationManager,
   PythonPartialEmitter,
@@ -8,7 +7,6 @@ import {
   PythonPartialOperationEmitter,
   createEmitters,
 } from "typespec-python";
-import { FlaskEmitter } from "typespec-flask";
 
 interface FilePair {
   model?: SourceFile<string>;
@@ -30,9 +28,11 @@ async function loadModelEmitter(
         return emitter;
       }
     }
-    throw new Error(`Failed to load emitter for package ${packageName}`);
+    throw new Error(
+      `Failed to load emitter for package ${packageName}. Could not find a class extending PythonPartialModelEmitter.`,
+    );
   } catch (e) {
-    throw new Error(`Failed to load emitter for package ${packageName}`);
+    throw new Error(`Failed to load emitter for package ${packageName}. Error ${e}`);
   }
 }
 
@@ -51,9 +51,11 @@ async function loadOperationEmitter(
         return emitter;
       }
     }
-    throw new Error(`Failed to load emitter for package ${packageName}`);
+    throw new Error(
+      `Failed to load emitter for package ${packageName}. Could not find a class extending PythonPartialOperationEmitter.`,
+    );
   } catch (e) {
-    throw new Error(`Failed to load emitter for package ${packageName}`);
+    throw new Error(`Failed to load emitter for package ${packageName}. Error ${e}`);
   }
 }
 
