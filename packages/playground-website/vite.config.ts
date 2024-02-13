@@ -18,6 +18,7 @@ const config = defineConfig(
       "typespec-python-server",
       "typespec-pydantic",
       "typespec-flask",
+      "typespec-python",
     ],
     samples: {
       "Basic Sample": {
