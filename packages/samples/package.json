@@ -42,7 +42,7 @@
     "dist/**",
     "!dist/test/**"
   ],
-  "dependencies": {
+  "peerDependencies": {
     "@typespec/compiler": "^0.52.0",
     "@typespec/http": "^0.52.0",
     "@typespec/openapi": "~0.52.0",

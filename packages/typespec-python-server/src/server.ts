@@ -1,6 +1,5 @@
 import { EmitContext, Scalar, emitFile } from "@typespec/compiler";
 import { AssetEmitter, Placeholder, SourceFile } from "@typespec/compiler/emitter-framework";
-import { PydanticEmitter } from "typespec-pydantic";
 import {
   DeclarationManager,
   PythonPartialEmitter,
@@ -8,11 +7,56 @@ import {
   PythonPartialOperationEmitter,
   createEmitters,
 } from "typespec-python";
-import { FlaskEmitter } from "typespec-flask";
 
 interface FilePair {
   model?: SourceFile<string>;
   operation?: SourceFile<string>;
+}
+
+async function loadModelEmitter(
+  packageName: string,
+  context: EmitContext<Record<string, never>>,
+): Promise<PythonPartialModelEmitter | undefined> {
+  try {
+    const module = await import(packageName);
+    for (const key in module) {
+      const val = module[key];
+      const prototype = val.prototype;
+      if (prototype instanceof PythonPartialModelEmitter) {
+        const constructor = val;
+        const emitter = createEmitters(context.program, constructor, context)[0] as PythonPartialModelEmitter;
+        return emitter;
+      }
+    }
+    throw new Error(
+      `Failed to load emitter for package ${packageName}. Could not find a class extending PythonPartialModelEmitter.`,
+    );
+  } catch (e) {
+    throw new Error(`Failed to load emitter for package ${packageName}. Error ${e}`);
+  }
+}
+
+async function loadOperationEmitter(
+  packageName: string,
+  context: EmitContext<Record<string, never>>,
+): Promise<PythonPartialOperationEmitter | undefined> {
+  try {
+    const module = await import(packageName);
+    for (const key in module) {
+      const val = module[key];
+      const prototype = val.prototype;
+      if (prototype instanceof PythonPartialOperationEmitter) {
+        const constructor = val;
+        const emitter = createEmitters(context.program, constructor, context)[0] as PythonPartialOperationEmitter;
+        return emitter;
+      }
+    }
+    throw new Error(
+      `Failed to load emitter for package ${packageName}. Could not find a class extending PythonPartialOperationEmitter.`,
+    );
+  } catch (e) {
+    throw new Error(`Failed to load emitter for package ${packageName}. Error ${e}`);
+  }
 }
 
 export async function $onEmit(context: EmitContext<Record<string, never>>) {
@@ -27,8 +71,19 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
     ),
     context,
   );
-  const modelEmitter = serverEmitter.modelEmitter;
-  const operationEmitter = serverEmitter.operationEmitter;
+  const options = context.options;
+  const modelEmitterPackage = options["model-emitter"] ?? "typespec-pydantic";
+  const operationEmitterPackage = options["operation-emitter"] ?? "typespec-flask";
+  const modelEmitter = (await loadModelEmitter(modelEmitterPackage, context)) as PythonPartialModelEmitter;
+  const operationEmitter = (await loadOperationEmitter(
+    operationEmitterPackage,
+    context,
+  )) as PythonPartialOperationEmitter;
+  modelEmitter.declarations = serverEmitter.declarations;
+  operationEmitter.declarations = serverEmitter.declarations;
+  serverEmitter.modelEmitter = modelEmitter;
+  serverEmitter.operationEmitter = operationEmitter;
+
   modelEmitter.emitProgram();
   operationEmitter.emitProgram();
   await modelEmitter.writeAllOutput();
@@ -67,17 +122,13 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
 }
 
 export class PythonServerEmitter extends PythonPartialEmitter {
-  public modelEmitter: PythonPartialModelEmitter;
-  public operationEmitter: PythonPartialOperationEmitter;
+  public modelEmitter!: PythonPartialModelEmitter;
+  public operationEmitter!: PythonPartialOperationEmitter;
 
   constructor(emitter: AssetEmitter<string, Record<string, never>>, context: EmitContext<Record<string, never>>) {
     const declarations = new DeclarationManager();
     super(emitter);
-    this.modelEmitter = createEmitters(context.program, PydanticEmitter, context)[0] as PydanticEmitter;
-    this.operationEmitter = createEmitters(context.program, FlaskEmitter, context)[0] as FlaskEmitter;
     this.declarations = declarations;
-    this.modelEmitter.declarations = declarations;
-    this.operationEmitter.declarations = declarations;
   }
 
   emitScalar(scalar: Scalar, name: string, sourceFile?: SourceFile<string> | undefined): string | Placeholder<string> {
