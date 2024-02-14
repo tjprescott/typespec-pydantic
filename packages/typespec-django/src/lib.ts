@@ -16,7 +16,7 @@ const DjangoEmitterOptionsSchema: JSONSchemaType<DjangoEmitterOptions> = {
 const libName = "typespec-django";
 
 export const $lib = createTypeSpecLibrary({
-  name: "typespec-django",
+  name: libName,
   diagnostics: {
     "unexpected-error": {
       severity: "error",

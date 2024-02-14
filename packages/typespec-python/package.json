@@ -47,6 +47,9 @@
     "@typespec/rest": "^0.52.0"
   },
   "devDependencies": {
+    "@typespec/compiler": "^0.52.0",
+    "@typespec/http": "^0.52.0",
+    "@typespec/rest": "^0.52.0",
     "@changesets/cli": "^2.27.1",
     "@types/node": "~18.11.9",
     "@typespec/prettier-plugin-typespec": "~0.50.0",

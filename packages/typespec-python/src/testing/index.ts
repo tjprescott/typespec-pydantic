@@ -81,19 +81,21 @@ export function checkImports(expected: Map<string, string[]>, lines: string[]) {
 }
 
 /** Compares an expected string to a subset of the actual output. */
-export function compare(expect: string, lines: string[], ignoreImports: boolean = true) {
+export function compare(expect: string, actual: string[], ignoreImports: boolean = true) {
   // split the input into lines and ignore leading or trailing empty lines.
   const expectedLines = trimLines(expect.split("\n"));
-  let checkLines = trimLines(lines);
+  let actualLines = trimLines(actual);
   if (ignoreImports) {
-    checkLines = checkLines.filter((line) => !line.startsWith("from"));
+    actualLines = actualLines.filter((line) => !line.startsWith("from"));
   }
-  strictEqual(expectedLines.length, checkLines.length);
-  for (let x = 0; x < checkLines.length; x++) {
+  strictEqual(expectedLines.length, actualLines.length);
+  for (let x = 0; x < actualLines.length; x++) {
+    const expect = expectedLines[x];
+    const actual = actualLines[x];
     strictEqual(
-      expectedLines[x],
-      checkLines[x],
-      `Actual differed from expected at line #${x + 1}\nACTUAL: '${checkLines[x]}'\nEXPECTED: '${expectedLines[x]}'`,
+      expect,
+      actual,
+      `Actual differed from expected at line #${x + 1}\nACTUAL: '${actual}'\nEXPECTED: '${expect}'`,
     );
   }
 }

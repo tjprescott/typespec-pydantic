@@ -71,7 +71,8 @@
     "typespec-pydantic": "workspace:~1.0.0-beta.1",
     "typespec-flask": "workspace:~1.0.0-beta.1",
     "typespec-python-server": "workspace:~1.0.0-beta.1",
-    "typespec-python": "workspace:~1.0.0-beta.1"
+    "typespec-python": "workspace:~1.0.0-beta.1",
+    "typespec-django": "workspace:~1.0.0-beta.1"
   },
   "devDependencies": {
     "@babel/core": "^7.22.20",

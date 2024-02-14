@@ -17,27 +17,13 @@ import {
   Union,
   emitFile,
   getDoc,
+  getKeyName,
   getKnownValues,
   getMaxLength,
-  getMaxValue,
-  getMaxValueExclusive,
-  getMinLength,
-  getMinValue,
-  getMinValueExclusive,
   getNamespaceFullName,
-  getPattern,
   getVisibility,
 } from "@typespec/compiler";
-import {
-  EmitEntity,
-  EmitterOutput,
-  Placeholder,
-  ReferenceCycle,
-  Scope,
-  SourceFile,
-  StringBuilder,
-  code,
-} from "@typespec/compiler/emitter-framework";
+import { EmitterOutput, Placeholder, SourceFile, StringBuilder, code } from "@typespec/compiler/emitter-framework";
 
 export async function $onEmit(context: EmitContext<Record<string, never>>) {
   const emitter = createEmitters(context.program, DjangoEmitter, context)[0] as DjangoEmitter;
@@ -60,67 +46,61 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
 
 /// Metadata for a Django field.
 interface DjangoFieldMetadata {
-  [key: string]: string | StringBuilder | number | boolean | string[] | Type | undefined | null;
-  // define a default value for a field.
-  default?: Type | string | number | null;
-  // define a callable that will be called to generate a default value.
-  defaultFactory?: string;
-  // whether the default value of the field should be validated. By default, it is not.
-  validateDefault?: boolean;
-  // description of the field
-  description?: string | StringBuilder;
-  // title of the field
-  title?: string;
-  // examples of the field
-  examples?: string[];
-  // extra JSON schema properties to be added to the field.
-  jsonSchemaExtra?: string;
-  // whether the field should be included in the string representation of the model.
-  repr?: boolean;
-  // define an alias for a field for both validation and serialization.
-  alias?: string;
-  // define an alias for a field for validation ONLY.
-  validationAlias?: string;
-  // define an alias for a field for serialization ONLY.
-  serializationAlias?: string;
-  // greater than
-  gt?: number;
-  // less than
-  lt?: number;
-  // greater than or equal to
-  ge?: number;
-  // less than or equal to
-  le?: number;
-  // multiple of the given number
-  multipleOf?: number;
-  // allow 'inf', '-inf' and 'nan' values.
-  allowInfNan?: boolean;
-  // minimum length of string
-  minLength?: number;
-  // maximum length of string
+  [key: string]: string | StringBuilder | number | boolean | string[] | Type | undefined | null | Map<string, string>;
+  /** If True, Django will store empty values as NULL in the database. Default is False. */
+  null?: boolean;
+  /** If True, the field is allowed to be blank. Default is False. */
+  blank?: boolean;
+  /** An enum containing the choices for this field. */
+  choices?: Enum;
+  /** The name of the database column to use for this field. If omitted, Django will use the field's name. */
+  dbColumn?: string;
+  /** The comment on the database column to use for this field.  */
+  dbComment?: string;
+  /** If True, a database index will be created for this field. */
+  dbIndex?: boolean;
+  /** The name of the database tablespace to use for this field's index, if this field is indexed. */
+  dbTablespace?: string;
+  /** The default value for the field. */
+  default?: Type | null;
+  /** If False, the field will not be displayed in the admin or any other ModelForm. Default is True. */
+  editable?: boolean;
+  /** Lets you override the default messages that the field will raise. Pass in dictionary with keys matching the error messages you want to override. */
+  errorMessages?: Map<string, string>;
+  /** Extra "help" text to displayed in the form widget. */
+  helpText?: string | StringBuilder;
+  /** If True, this field is the primary key for the model. */
+  primaryKey?: boolean;
+  /** If True, this field must be unique throughout the table. */
+  unique?: boolean;
+  /** Set this to the name of a date or datetime property to require that this field be unique for the value of the date field. */
+  uniqueForDate?: boolean;
+  /** Like uniqueForDate but required the field to be unique with respect to the month. */
+  uniqueForMonth?: boolean;
+  /** Like uniqueForDate but required the field to be unique with respect to the year. */
+  uniqueForYear?: boolean;
+  /** A human-readable name of the field. */
+  verboseName?: string;
+  /** A list of validators to run for this field. */
+  validators?: string[];
+  /** The maximum length of the field. */
   maxLength?: number;
-  // a regular expression that the string must match
-  pattern?: string;
-  // maximum number of digits within the Decimal. It does not include a zero before the decimal point or trailing decimal zeros.
+  /** The database collation name of the field. */
+  dbCollation?: string;
+  /** Automatically set the field to now every time the object is saved. Useful for "last-modified" timestamps. */
+  autoNow?: boolean;
+  /** Automatically set the field to now when the object is first created. Useful for creation of timestamps. */
+  autoNowAdd?: boolean;
+  /** Tha maximum number of digits allowed in the number. Must be greater than or equal to decimalPlaces. */
   maxDigits?: number;
-  // maximum number of decimal places allowed. It does not include trailing decimal zeroes.
+  /** The number of decimal places to store with the number. */
   decimalPlaces?: number;
-  // whether the field should be seen as init-only field in the dataclass.
-  initVar?: boolean;
-  // whether the field should be a keyword-only argument in the constructor of the dataclass.
-  kwOnly?: boolean;
-  // the field that will be used to discriminate between different models in a union.
-  discriminator?: string;
-  // whether the field should be validated in "strict mode".
-  strict?: boolean;
-  // prevent the field from being assigned a new value after the model is created (immutability).
-  frozen?: boolean;
-  // whether the field should be excluded from the model when exporting the model.
-  exclude?: boolean;
 }
 
 export class DjangoEmitter extends PythonPartialModelEmitter {
-  #emitFieldValue(value: string | StringBuilder | number | boolean | Type | string[] | null): string | StringBuilder {
+  #emitFieldValue(
+    value: string | StringBuilder | number | boolean | Type | string[] | null | Map<string, string>,
+  ): string | StringBuilder {
     if (typeof value === "boolean") {
       return value ? "True" : "False";
     } else if (typeof value === "string") {
@@ -139,11 +119,9 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
     }
   }
 
-  #emitField(
+  #emitFieldParameters(
     builder: StringBuilder,
     item: ModelProperty | EnumMember | Scalar,
-    emitEquals: boolean = true,
-    emitEmptyField: boolean = false,
     sourceFile?: SourceFile<string>,
   ): StringBuilder {
     const metadata: DjangoFieldMetadata = {};
@@ -151,64 +129,55 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
     // gather metadata
     const doc = getDoc(this.emitter.getProgram(), item);
     const mergedLines = doc?.split("\n").join("\\n");
-    metadata.description = mergedLines !== undefined ? code`"${mergedLines}"` : undefined;
+    metadata.helpText = mergedLines !== undefined ? code`"${mergedLines}"` : undefined;
     if (item.kind === "ModelProperty") {
+      const key = getKeyName(this.emitter.getProgram(), item);
+      if (key === item.name) {
+        metadata.primaryKey = true;
+      }
       const isOptional = item.optional;
       if (item.default !== undefined) {
         metadata.default = item.default;
       } else if (isOptional) {
         metadata.default = null;
+        metadata.blank = true;
       }
     } else if (item.kind === "EnumMember") {
-      metadata.default = item.value !== undefined ? item.value : this.transformReservedName(item.name);
-      metadata.frozen = true;
+      // FIXME: Update for enums
+      // metadata.default = item.value !== undefined ? item.value : this.transformReservedName(item.name);
+      // metadata.frozen = true;
+      metadata.choices = item.enum;
     }
 
     // check for read-only properties
     const visibility = getVisibility(this.emitter.getProgram(), item);
     if (visibility !== undefined && visibility.length === 1 && visibility[0] === "read") {
-      metadata.frozen = true;
+      metadata.editable = false;
     }
 
     // gather string metadata
-    metadata.minLength = getMinLength(this.emitter.getProgram(), item);
     metadata.maxLength = getMaxLength(this.emitter.getProgram(), item);
-    metadata.pattern = getPattern(this.emitter.getProgram(), item);
-
-    // gather numeric metadata
-    metadata.ge = getMinValue(this.emitter.getProgram(), item);
-    metadata.gt = getMinValueExclusive(this.emitter.getProgram(), item);
-    metadata.le = getMaxValue(this.emitter.getProgram(), item);
-    metadata.lt = getMaxValueExclusive(this.emitter.getProgram(), item);
-
-    // gather discriminator metadata
-    if (item.kind === "ModelProperty") {
-      const discriminator = this.findDiscriminator(item.type);
-      metadata.discriminator = discriminator !== undefined ? discriminator : undefined;
-    } else {
-      metadata.discriminator = undefined;
-    }
 
     // TODO: completely unsupported metadata
-    metadata.defaultFactory = undefined;
-    metadata.examples = undefined;
-    metadata.jsonSchemaExtra = undefined;
+    metadata.errorMessages = undefined;
+    metadata.validators = undefined;
 
     // TODO: Supported with @field decorator
-    metadata.validateDefault = undefined;
-    metadata.title = undefined;
-    metadata.repr = undefined;
-    metadata.alias = undefined;
-    metadata.validationAlias = undefined;
-    metadata.serializationAlias = undefined;
-    metadata.multipleOf = undefined;
-    metadata.allowInfNan = undefined;
+    metadata.null = undefined;
+    metadata.dbColumn = undefined;
+    metadata.dbComment = undefined;
+    metadata.dbIndex = undefined;
+    metadata.dbTablespace = undefined;
+    metadata.unique = undefined;
+    metadata.uniqueForDate = undefined;
+    metadata.uniqueForMonth = undefined;
+    metadata.uniqueForYear = undefined;
+    metadata.verboseName = undefined;
+    metadata.dbCollation = undefined;
+    metadata.autoNow = undefined;
+    metadata.autoNowAdd = undefined;
     metadata.maxDigits = undefined;
     metadata.decimalPlaces = undefined;
-    metadata.initVar = undefined;
-    metadata.kwOnly = undefined;
-    metadata.strict = undefined;
-    metadata.exclude = undefined;
 
     // delete any undefined values
     for (const [key, val] of Object.entries(metadata)) {
@@ -217,15 +186,7 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
       }
     }
 
-    // don't emit anything if there is no metadata
-    if (Object.keys(metadata).length === 0 && !emitEmptyField) return builder;
-
-    // emit metadata
-    if (emitEquals) {
-      builder.push(code` = `);
-    }
-    this.imports.add("pydantic", "Field", ImportKind.regular, sourceFile);
-    builder.push(code`Field(`);
+    builder.push(code`(`);
     let i = 0;
     const length = Object.keys(metadata).length;
     for (const [key, val] of Object.entries(metadata)) {
@@ -238,28 +199,11 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
     return builder;
   }
 
-  circularReference(
-    target: EmitEntity<string>,
-    scope: Scope<string> | undefined,
-    cycle: ReferenceCycle,
-  ): string | EmitEntity<string> {
-    if (scope?.kind === "sourceFile" && target.kind === "declaration") {
-      const targetName = target.name;
-      const targetPath = this.buildNamespaceFromScope(target.scope);
-      const sourcePath = this.buildNamespaceFromScope(scope);
-      if (targetPath !== sourcePath) {
-        this.imports.add("typing", "TYPE_CHECKING");
-        this.imports.add(targetPath === GlobalNamespace ? "models" : targetPath, targetName, ImportKind.deferred);
-      }
-    }
-    return super.circularReference(target, scope, cycle);
-  }
-
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
     const builder = new StringBuilder();
-    const baseModel = model.baseModel?.name ?? "BaseModel";
-    if (baseModel === "BaseModel") {
-      this.imports.add("pydantic", "BaseModel");
+    const baseModel = model.baseModel?.name ?? "models.Model";
+    if (baseModel === "models.Model") {
+      this.imports.add("django.db", "models");
     }
     builder.push(code`class ${name}(${baseModel}):\n`);
     this.emitDocs(builder, model);
@@ -288,7 +232,7 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
   #emitType(name: string, type: Model | Scalar, sourceFile?: SourceFile<string>): string | StringBuilder | undefined {
     if (type.kind === "Model") {
       const props = this.emitter.emitModelProperties(type);
-      return code`class ${name}(BaseModel):\n${props}\n`;
+      return code`class ${name}(models.Model):\n${props}\n`;
     } else if (type.kind === "Scalar") {
       return this.emitScalar(type, name, sourceFile) + "\n";
     }
@@ -325,8 +269,6 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
 
   modelPropertyLiteral(property: ModelProperty): EmitterOutput<string> {
     const builder = new StringBuilder();
-    const isOptional = property.optional;
-    const knownValues = getKnownValues(this.emitter.getProgram(), property);
     let type: string | StringBuilder | undefined = undefined;
     type = this.emitTypeReference(property.type);
 
@@ -345,32 +287,8 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
     // don't emit anything if type is `never`
     if (property.type.kind === "Intrinsic" && property.type.name === "never") return code``;
 
-    const isLit = this.isLiteral(property.type);
-    builder.push(code`${this.transformReservedName(this.toSnakeCase(property.name))}: `);
-    if (isOptional) {
-      this.imports.add("typing", "Optional");
-      builder.push(code`Optional[`);
-    }
-    if (isLit) {
-      this.imports.add("typing", "Literal");
-      builder.push(code`Literal[`);
-    }
-    if (property.type.kind === "Union") {
-      builder.push(code`${this.emitter.emitUnionVariants(property.type)}`);
-    } else if (property.type.kind === "UnionVariant") {
-      builder.push(code`${this.emitTypeReference(property.type.type)}`);
-    } else if (property.type.kind === "Scalar" && knownValues !== undefined) {
-      builder.push(code`Union[${type}, ${knownValues.name}]`);
-    } else {
-      builder.push(code`${type}`);
-    }
-    if (isLit) {
-      builder.push(code`]`);
-    }
-    if (isOptional) {
-      builder.push(code`]`);
-    }
-    this.#emitField(builder, property);
+    builder.push(code`${this.transformReservedName(this.toSnakeCase(property.name))} = ${type}`);
+    this.#emitFieldParameters(builder, property);
     builder.push(code`\n`);
     this.emitDocs(builder, property);
     return builder.reduce();
@@ -408,7 +326,7 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
   enumMember(member: EnumMember): EmitterOutput<string> {
     const builder = new StringBuilder();
     builder.push(code`${this.toSnakeCase(member.name).toUpperCase()}`);
-    this.#emitField(builder, member);
+    this.#emitFieldParameters(builder, member);
     builder.push(code`\n`);
     this.emitDocs(builder, member);
     return builder.reduce();
@@ -420,10 +338,11 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
   }
 
   arrayDeclaration(array: Model, name: string, elementType: Type): EmitterOutput<string> {
+    throw new Error("arrayDeclaration is not implemented for DjangoEmitter");
     const builder = new StringBuilder();
-    this.imports.add("pydantic", "RootModel");
+    this.imports.add("django.db", "models");
     this.imports.add("typing", "List");
-    builder.push(code`class ${name}(RootModel):\n`);
+    builder.push(code`class ${name}(models.RootModel):\n`);
     builder.push(code`${this.indent()}root: List[${this.emitTypeReference(elementType)}]\n\n`);
     builder.push(code`${this.indent()}def __iter__(self):\n${this.indent(2)}return iter(self.root)\n\n`);
     builder.push(code`${this.indent()}def __getitem__(self, item):\n${this.indent(2)}return self.root[item]\n\n`);
@@ -449,9 +368,46 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
       builder.push(code`${baseScalarName}, `);
     }
 
-    this.#emitField(builder, scalar, false, true, sourceFile);
+    this.#emitFieldParameters(builder, scalar, sourceFile);
     builder.push(code`]`);
     return builder.reduce();
+  }
+
+  /** Converts the Python primitive to a Django field name */
+  #scalarToFieldName(scalarName: string): string | StringBuilder {
+    this.imports.add("django.db", "models");
+    switch (scalarName) {
+      case "str":
+        return code`models.CharField`;
+      case "int":
+        return code`models.IntegerField`;
+      case "float":
+        return code`models.FloatField`;
+      case "bool":
+        return code`models.BooleanField`;
+      case "Decimal":
+        return code`models.DecimalField`;
+      case "datetime":
+        return code`models.DateTimeField`;
+      case "date":
+        return code`models.DateField`;
+      case "time":
+        return code`models.TimeField`;
+      case "bytes":
+        return code`models.BinaryField`;
+      case "list":
+      case "tuple":
+      case "range":
+      case "bytearray":
+      case "memoryview":
+      case "dict":
+      case "set":
+      case "frozenset":
+      case "complex":
+        throw new Error(`${scalarName} not supported in Django`);
+      default:
+        return code`${scalarName}`;
+    }
   }
 
   scalarDeclaration(scalar: Scalar, name: string): EmitterOutput<string> {
@@ -464,7 +420,8 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
     if (scalar.namespace !== undefined) {
       const namespaceName = getNamespaceFullName(scalar.namespace);
       if (namespaceName === "TypeSpec") {
-        return code`${converted}`;
+        // FIXME: This needs to emit the whole field defintion?
+        return this.#scalarToFieldName(converted);
       }
     }
     return this.declarations!.declare(this, {

@@ -19,6 +19,7 @@ const config = defineConfig(
       "typespec-pydantic",
       "typespec-flask",
       "typespec-python",
+      "typespec-django",
     ],
     samples: {
       "Basic Sample": {

@@ -38,14 +38,14 @@ describe("typespec-django: core", () => {
       __all__ = ["ModelA"]
       `;
       const aModelExpect = `
-      from pydantic import BaseModel, Field
+      from pydantic import models.Model, Field
       from a.b import ModelB
       from typing import Optional, List, TYPE_CHECKING
 
       if TYPE_CHECKING:
           from a.b.c import ModelC
 
-      class ModelA(BaseModel):
+      class ModelA(models.Model):
           name: str
 
           b: Optional[ModelB] = Field(default=None)
@@ -58,14 +58,14 @@ describe("typespec-django: core", () => {
       __all__ = ["ModelB"]
       `;
       const bModelExpect = `
-      from pydantic import BaseModel, Field
+      from pydantic import models.Model, Field
       from typing import Optional, List, TYPE_CHECKING
 
       if TYPE_CHECKING:
           from a import ModelA
           from a.b.c import ModelC
 
-      class ModelB(BaseModel):
+      class ModelB(models.Model):
           name: str
 
           a: Optional["ModelA"] = Field(default=None)
@@ -78,12 +78,12 @@ describe("typespec-django: core", () => {
       __all__ = ["ModelC"]
       `;
       const cModelExpect = `
-      from pydantic import BaseModel, Field
+      from pydantic import models.Model, Field
       from a import ModelA
       from typing import List, Optional
       from a.b import ModelB
 
-      class ModelC(BaseModel):
+      class ModelC(models.Model):
           name: str
 
           a: Optional[ModelA] = Field(default=None)
@@ -128,10 +128,10 @@ describe("typespec-django: core", () => {
       __all__ = ["ModelA"]
       `;
       const aModelExpect = `
-      from pydantic import BaseModel
+      from pydantic import models.Model
       from a.b import ModelB
 
-      class ModelA(BaseModel):
+      class ModelA(models.Model):
           b: ModelB
       `;
       const bInitExpect = `
@@ -140,13 +140,13 @@ describe("typespec-django: core", () => {
       __all__ = ["ModelB"]
       `;
       const bModelExpect = `
-      from pydantic import BaseModel
+      from pydantic import models.Model
       from typing import TYPE_CHECKING
 
       if TYPE_CHECKING:
           from a.b.c import ModelC
 
-      class ModelB(BaseModel):
+      class ModelB(models.Model):
           c: "ModelC"
       `;
       const cInitExpect = `
@@ -155,10 +155,10 @@ describe("typespec-django: core", () => {
       __all__ = ["ModelC"]
       `;
       const cModelExpect = `
-      from pydantic import BaseModel
+      from pydantic import models.Model
       from a import ModelA
 
-      class ModelC(BaseModel):
+      class ModelC(models.Model):
           a: ModelA
       `;
       const [results, diagnostics] = await djangoOutputFor(input);
@@ -192,27 +192,27 @@ describe("typespec-django: core", () => {
       }
       `;
       const aModelExpect = `
-      from pydantic import BaseModel
+      from pydantic import models.Model
       from a.b import ModelB
 
-      class ModelA(BaseModel):
+      class ModelA(models.Model):
           b: ModelB
       `;
       const bModelExpect = `
-      from pydantic import BaseModel
+      from pydantic import models.Model
       from typing import TYPE_CHECKING
 
       if TYPE_CHECKING:
           from a.b.c import ModelC
 
-      class ModelB(BaseModel):
+      class ModelB(models.Model):
           c: "ModelC"
       `;
       const cModelExpect = `
-      from pydantic import BaseModel
+      from pydantic import models.Model
       from a.b import ModelB
 
-      class ModelC(BaseModel):
+      class ModelC(models.Model):
           b: ModelB
       `;
       const [results, diagnostics] = await djangoOutputFor(input);
@@ -240,18 +240,18 @@ describe("typespec-django: core", () => {
           }
         }`;
       const widgetsExpect = `
-        from pydantic import BaseModel
+        from pydantic import models.Model
 
-        class WidgetString(BaseModel):
+        class WidgetString(models.Model):
             contents: str
 
-        class IntWidget(BaseModel):
+        class IntWidget(models.Model):
             contents: int`;
       const partsExpect = `
-        from pydantic import BaseModel
+        from pydantic import models.Model
         from widgets import WidgetString
 
-        class WidgetPart(BaseModel):
+        class WidgetPart(models.Model):
             widget: WidgetString
         `;
       const widgetInitExpect = `
@@ -284,16 +284,18 @@ describe("typespec-django: core", () => {
         }`;
 
       const expect = `
-        class Widget(BaseModel):
-            name: str
-            price: float
-            action: bool
-            created: datetime
-            file: bytes
-        `;
+        from django.db import models
+        from datetime import datetime
+
+        class Widget(models.Model):
+            name = models.CharField()
+            price = models.FloatField()
+            action = models.BooleanField()
+            created = models.DateTimeField()
+            file = models.BinaryField()`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      compare(expect, result[0].contents);
+      compare(expect, result[0].contents, false);
     });
 
     it("supports @knownValues", async () => {
@@ -308,12 +310,12 @@ describe("typespec-django: core", () => {
           shape: string;
         }`;
       const expect = `
-        class Widget(BaseModel):
-            shape: Union[str, WidgetShape]
+        class Widget(models.Model):
+            shape = models.CharField(choices=WidgetShape.choices)
 
-        class WidgetShape(Enum):
-            SQUARE = Field(default="square", frozen=True)
-            CIRCLE = Field(default="circle", frozen=True)`;
+        class WidgetShape(models.TextChoices):
+            SQUARE = "SQUARE", _("square")
+            CIRCLE = "CIRCLE", _("circle")`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result[0].contents);
@@ -328,9 +330,9 @@ describe("typespec-django: core", () => {
         }`;
 
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             """This is a widget."""
-            name: str = Field(description="The name of the widget.")
+            name = models.CharField(help_text="The name of the widget.")
             """The name of the widget."""
         `;
       const [result, diagnostics] = await djangoOutputFor(input);
@@ -355,13 +357,13 @@ describe("typespec-django: core", () => {
         }`;
 
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             """
             This is a widget.
             
             It is so amazing and wonderful... and a widget.
             """
-            name: str = Field(description="The name of the widget.\\n\\nIt can really be any name you want. Really.")
+            name = models.CharField(help_text="The name of the widget.\\n\\nIt can really be any name you want. Really.")
             """
             The name of the widget.
             
@@ -376,15 +378,13 @@ describe("typespec-django: core", () => {
     it("supports string constraints", async () => {
       const input = `
         model Widget {
-          @minLength(1)
           @maxLength(10)
-          @pattern("^[a-zA-Z_]*$")
           name: string;
         }`;
 
       const expect = `
-        class Widget(BaseModel):
-            name: str = Field(min_length=1, max_length=10, pattern="^[a-zA-Z_]*$")
+        class Widget(models.Model):
+            name = models.CharField(max_length=10)
         `;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -401,10 +401,10 @@ describe("typespec-django: core", () => {
         `;
 
       const expect = `
-        class Foo(BaseModel):
-            in_: str
-            def_: str
-            class_: str
+        class Foo(models.Model):
+            in_ = models.CharField()
+            def_ = models.CharField()
+            class_ = models.CharField()
         `;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -418,8 +418,8 @@ describe("typespec-django: core", () => {
         }`;
 
       const expect = `
-        class Foo(BaseModel):
-            _1: str`;
+        class Foo(models.Model):
+            _1 = models.CharField()`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result[0].contents);
@@ -435,11 +435,11 @@ describe("typespec-django: core", () => {
         }`;
 
       const expect = `
-        class Widget(BaseModel):
-            name: str = Field(default="Widget")
-            price: float = Field(default=9.99)
-            num: int = Field(default=1)
-            action: bool = Field(default=True)
+        class Widget(models.Model):
+            name = models.CharField(default="Widget")
+            price = models.FloatField(default=9.99)
+            num = models.IntegerField(default=1)
+            action = models.BooleanField(default=True)
         `;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -454,8 +454,8 @@ describe("typespec-django: core", () => {
         }`;
 
       const expect = `
-        class Widget(BaseModel):
-            name: str = Field(default="Widget", frozen=True)`;
+        class Widget(models.Model):
+            name = models.CharField(default="Widget", editable=False)`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result[0].contents);
@@ -471,7 +471,7 @@ describe("typespec-django: core", () => {
         }`;
 
       const expect = `
-        class Foo(BaseModel):
+        class Foo(models.Model):
             p2: None
             p3: object
             p4: None
@@ -491,12 +491,11 @@ describe("typespec-django: core", () => {
         }`;
 
       const expect = `
-        class Foo(BaseModel):
-            prop: str
+        class Foo(models.Model):
+            prop = models.CharField()
 
-        class Bar(BaseModel):
-            prop: str
-        `;
+        class Bar(models.Model):
+            prop = models.CharField()`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       compare(expect, result[0].contents);
@@ -511,7 +510,7 @@ describe("typespec-django: core", () => {
         }`;
 
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             name: Literal["widget"]
             price: Literal[15.5]
             action: Literal[True]
@@ -528,19 +527,15 @@ describe("typespec-django: core", () => {
         }`;
 
       const expect = `
-        class Widget(BaseModel):
+        from django.db import models
+        from typing import List
+
+        class Widget(models.Model):
             parts: List[str]
         `;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
-      checkImports(
-        new Map([
-          ["pydantic", ["BaseModel"]],
-          ["typing", ["List"]],
-        ]),
-        result[0].contents,
-      );
-      compare(expect, result[0].contents);
+      compare(expect, result[0].contents, false);
     });
 
     it("supports array declaration as RootModel", async () => {
@@ -561,7 +556,7 @@ describe("typespec-django: core", () => {
             def __getitem__(self, item):
                 return self.root[item]
 
-        class Widget(BaseModel):
+        class Widget(models.Model):
             parts: WidgetParts`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -577,7 +572,7 @@ describe("typespec-django: core", () => {
         }`;
 
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             parts: List[str]`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -591,7 +586,7 @@ describe("typespec-django: core", () => {
         }`;
 
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             parts: Tuple[str, int, List[float]]`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -609,10 +604,10 @@ describe("typespec-django: core", () => {
             name: string;
         }`;
       const expect = `
-        class WidgetPart(BaseModel):
+        class WidgetPart(models.Model):
             name: str
 
-        class Widget(BaseModel):
+        class Widget(models.Model):
             part: WidgetPart
             parts: List[WidgetPart]`;
       const [result, diagnostics] = await djangoOutputFor(input);
@@ -630,10 +625,10 @@ describe("typespec-django: core", () => {
             a: ModelA;
         }`;
       const expect = `
-        class ModelB(BaseModel):
+        class ModelB(models.Model):
             a: "ModelA"
 
-        class ModelA(BaseModel):
+        class ModelA(models.Model):
             b: ModelB`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -646,7 +641,7 @@ describe("typespec-django: core", () => {
             properties: Record<string>;
         }`;
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             properties: Dict[str, str]`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -661,7 +656,7 @@ describe("typespec-django: core", () => {
             }
         }`;
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             widget_part: object`;
       const [result, _] = await djangoOutputFor(input);
       compare(expect, result[0].contents);
@@ -673,7 +668,7 @@ describe("typespec-django: core", () => {
             someWeirdCasing: string;
         }`;
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             some_weird_casing: str`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -686,7 +681,7 @@ describe("typespec-django: core", () => {
             name?: string;
         }`;
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             name: Optional[str] = Field(default=None)`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -703,10 +698,10 @@ describe("typespec-django: core", () => {
 
         model IntWidget is Widget<int32>;`;
       const expect = `
-        class StringWidget(BaseModel):
+        class StringWidget(models.Model):
             contents: str
             
-        class IntWidget(BaseModel):
+        class IntWidget(models.Model):
             contents: int`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -727,13 +722,13 @@ describe("typespec-django: core", () => {
           widget: Widget<string>;
         }`;
       const expect = `
-      class WidgetString(BaseModel):
+      class WidgetString(models.Model):
           contents: str
 
-      class WidgetPart(BaseModel):
+      class WidgetPart(models.Model):
           widget: WidgetString
 
-      class Foo(BaseModel):
+      class Foo(models.Model):
           widget: WidgetString`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -750,7 +745,7 @@ describe("typespec-django: core", () => {
             widget: SomeUnion<string>;
         };`;
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             widget: Union[str]`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -779,15 +774,15 @@ describe("typespec-django: core", () => {
           shape: Shape
         }`;
       const expect = `
-        class Circle(BaseModel):
+        class Circle(models.Model):
             kind: Literal["Circle"]
             radius: float
       
-        class Square(BaseModel):
+        class Square(models.Model):
             kind: Literal["Square"]
             length: float
             
-        class Foo(BaseModel):
+        class Foo(models.Model):
             shape: Union[Circle, Square] = Field(discriminator="kind")`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -813,7 +808,7 @@ describe("typespec-django: core", () => {
           shape: Shape
         }`;
       const expect = `
-        class Shape(BaseModel):
+        class Shape(models.Model):
             pass
 
         class Circle(Shape):
@@ -824,7 +819,7 @@ describe("typespec-django: core", () => {
             kind: Literal["Square"]
             length: float
             
-        class Foo(BaseModel):
+        class Foo(models.Model):
             shape: Shape = Field(discriminator="kind")`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -841,7 +836,7 @@ describe("typespec-django: core", () => {
 
         op getWidget(name: string): Widget;`;
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             name: str`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -860,7 +855,7 @@ describe("typespec-django: core", () => {
             getWidget(name: string): Widget;
         }`;
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             name: str`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -898,7 +893,7 @@ describe("typespec-django: core", () => {
             GREEN = Field(default="Green", frozen=True)
             BLUE = Field(default="Blue", frozen=True)
 
-        class Widget(BaseModel):
+        class Widget(models.Model):
             shape: Optional[WidgetShape] = Field(default=None)
             color: Optional[WidgetColor] = Field(default=None)`;
       const [result, diagnostics] = await djangoOutputFor(input);
@@ -970,7 +965,7 @@ describe("typespec-django: core", () => {
             circle: WidgetShape.circle;
         }`;
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             cube: Literal[WidgetShape.CUBE]
             circle: Literal[WidgetShape.CIRCLE]
 
@@ -993,7 +988,7 @@ describe("typespec-django: core", () => {
             mixed?: "moo" | int16;
         }`;
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             color: Literal["red", "green", "blue"]
             count: Literal[1, 2, 3]
             numbers: Union[int, float]
@@ -1032,7 +1027,7 @@ describe("typespec-django: core", () => {
         }`;
 
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             type: Optional[Union[int, str, bool]] = Field(default=None)
             literal: Optional[Literal[1, "two", False]] = Field(default=None)
             named_reference: bool
@@ -1058,10 +1053,10 @@ describe("typespec-django: core", () => {
       const expect = `
         MyStringString = Annotated[str, Field()]
 
-        class Widget(BaseModel):
+        class Widget(models.Model):
             name: MyStringString
 
-        class Foo(BaseModel):
+        class Foo(models.Model):
             name: MyStringString`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -1080,7 +1075,7 @@ describe("typespec-django: core", () => {
       const contentExpect = `
         MyString = Annotated[str, Field(description="My custom string", min_length=1)]
  
-        class Widget(BaseModel):
+        class Widget(models.Model):
             name: MyString`;
       const initExpect = `
         from models import MyString, Widget
@@ -1104,7 +1099,7 @@ describe("typespec-django: core", () => {
             dateTime: utcDateTime;
         }`;
       const expect = `
-        class Widget(BaseModel):
+        class Widget(models.Model):
             name: str
             price: float
             num: int
@@ -1128,7 +1123,7 @@ describe("typespec-django: core", () => {
       const expect = `
         Id = Annotated[str, Field()]
 
-        class Widget(BaseModel):
+        class Widget(models.Model):
             id: Id`;
       const [result, diagnostics] = await djangoOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
@@ -1151,7 +1146,7 @@ describe("typespec-django: core", () => {
       const expect = `
         WidgetShapes = Annotated[Union[str, WidgetShape], Field()]
 
-        class Widget(BaseModel):
+        class Widget(models.Model):
             shape: WidgetShapes
 
         class WidgetShape(Enum):
@@ -1177,7 +1172,7 @@ describe("typespec-django: core", () => {
               cost: float;
           };`;
         const expect = `
-          class Widget(BaseModel):
+          class Widget(models.Model):
               name: str = Field(title="The Widget of Oz", kw_only=True)
               cost: float = Field(decimal_places=2, max_digits=5)`;
         const [result, diagnostics] = await djangoOutputFor(input);

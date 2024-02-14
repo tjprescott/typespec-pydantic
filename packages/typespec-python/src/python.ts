@@ -22,11 +22,13 @@ import {
   CodeTypeEmitter,
   Context,
   Declaration,
+  EmitEntity,
   EmittedSourceFile,
   EmitterOutput,
   NoEmit,
   Placeholder,
   RawCode,
+  ReferenceCycle,
   Scope,
   SourceFile,
   StringBuilder,
@@ -617,6 +619,23 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
       emittedSourceFile.contents += decl.decl.value + "\n";
     }
     return emittedSourceFile;
+  }
+
+  circularReference(
+    target: EmitEntity<string>,
+    scope: Scope<string> | undefined,
+    cycle: ReferenceCycle,
+  ): string | EmitEntity<string> {
+    if (scope?.kind === "sourceFile" && target.kind === "declaration") {
+      const targetName = target.name;
+      const targetPath = this.buildNamespaceFromScope(target.scope);
+      const sourcePath = this.buildNamespaceFromScope(scope);
+      if (targetPath !== sourcePath) {
+        this.imports.add("typing", "TYPE_CHECKING");
+        this.imports.add(targetPath === GlobalNamespace ? "models" : targetPath, targetName, ImportKind.deferred);
+      }
+    }
+    return super.circularReference(target, scope, cycle);
   }
 
   /** Helper method to get the Program instance from the underlying asset emitter. */
