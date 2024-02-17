@@ -1,4 +1,4 @@
-import { JSONSchemaType, createTypeSpecLibrary } from "@typespec/compiler";
+import { JSONSchemaType, createTypeSpecLibrary, paramMessage } from "@typespec/compiler";
 
 export interface DjangoEmitterOptions {
   "output-file"?: string;
@@ -18,6 +18,12 @@ const libName = "typespec-django";
 export const $lib = createTypeSpecLibrary({
   name: libName,
   diagnostics: {
+    "invalid-field-value": {
+      severity: "error",
+      messages: {
+        default: paramMessage`Invalid field value '${"value"}' for '${"fieldName"}'.`,
+      },
+    },
     "unexpected-error": {
       severity: "error",
       messages: {

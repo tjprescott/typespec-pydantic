@@ -12,6 +12,7 @@ import {
   EnumMember,
   Model,
   ModelProperty,
+  NoTarget,
   Scalar,
   Type,
   Union,
@@ -22,8 +23,12 @@ import {
   getMaxLength,
   getNamespaceFullName,
   getVisibility,
+  navigateProgram,
+  navigateTypesInNamespace,
 } from "@typespec/compiler";
 import { EmitterOutput, Placeholder, SourceFile, StringBuilder, code } from "@typespec/compiler/emitter-framework";
+import { getFields } from "./decorators.js";
+import { reportDiagnostic } from "./lib.js";
 
 export async function $onEmit(context: EmitContext<Record<string, never>>) {
   const emitter = createEmitters(context.program, DjangoEmitter, context)[0] as DjangoEmitter;
@@ -43,6 +48,18 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
     }
   }
 }
+
+// FIXME: Move validation here
+// export function $onValidate(context: EmitContext<Record<string, never>>) {
+//   navigateProgram(context.program, {
+//     namespace: (namespace) => {
+//       const test = "best";
+//     },
+//     model: (model) => {
+//       const test = "best";
+//     },
+//   });
+// }
 
 /// Metadata for a Django field.
 interface DjangoFieldMetadata {
@@ -97,6 +114,62 @@ interface DjangoFieldMetadata {
   decimalPlaces?: number;
 }
 
+/** The field names that are applicable to every field. */
+const UniversalFieldKeys: Set<string> = new Set([
+  "null",
+  "blank",
+  "choices",
+  "dbColumn",
+  "dbComment",
+  "dbDefault",
+  "dbIndex",
+  "dbTablespace",
+  "default",
+  "editable",
+  "errorMessages",
+  "helpText",
+  "primaryKey",
+  "unique",
+  "uniqueForDate",
+  "uniqueForMonth",
+  "uniqueForYear",
+  "verboseName",
+  "validators",
+]);
+
+const FieldSpecificKeys = new Map<string, Set<string>>([
+  ["BinaryField", new Set(["maxLength"])],
+  ["CharField", new Set(["maxLength", "dbCollation"])],
+  ["DateField", new Set(["autoNow", "autoNowAdd"])],
+  ["DateTimeField", new Set(["autoNow", "autoNowAdd"])],
+  ["DecimalField", new Set(["maxDigits", "decimalPlaces"])],
+  ["EmailField", new Set(["maxLength"])],
+  ["FileField", new Set(["uploadTo", "storage", "maxLength"])],
+  ["FilePathField", new Set(["path", "match", "recursive", "allowFiles", "allowFolders", "maxLength"])],
+  ["GenericIPAddressField", new Set(["protocol", "unpackIpv4"])],
+  ["ImageField", new Set(["uploadTo", "widthField", "heightField", "maxLength"])],
+  ["SlugField", new Set(["maxLength"])],
+  ["TimeField", new Set(["autoNow", "autoNowAdd"])],
+  ["URLField", new Set(["maxLength"])],
+  ["ForeignKey", new Set(["to", "onDelete"])],
+  [
+    "ManyToManyField",
+    new Set([
+      "to",
+      "relatedName",
+      "relatedQueryName",
+      "limitChoicesTo",
+      "symmetrical",
+      "through",
+      "throughFields",
+      "dbTable",
+      "dbConstraint",
+      "swappable",
+    ]),
+  ],
+  ["OneToOneField", new Set(["to", "parentLink", "onDelete"])],
+]);
+
 export class DjangoEmitter extends PythonPartialModelEmitter {
   #emitFieldValue(
     value: string | StringBuilder | number | boolean | Type | string[] | null | Map<string, string>,
@@ -122,6 +195,7 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
   #emitFieldParameters(
     builder: StringBuilder,
     item: ModelProperty | EnumMember | Scalar,
+    fieldName: string | StringBuilder,
     sourceFile?: SourceFile<string>,
   ): StringBuilder {
     const metadata: DjangoFieldMetadata = {};
@@ -178,6 +252,29 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
     metadata.autoNowAdd = undefined;
     metadata.maxDigits = undefined;
     metadata.decimalPlaces = undefined;
+
+    const fieldType = fieldName.toString().split(".").pop() ?? "UNKNOWN";
+
+    if (item.kind === "ModelProperty") {
+      const fields = getFields(this.emitter.getProgram(), item);
+      for (const field of fields ?? []) {
+        const fieldKeys = FieldSpecificKeys.get(fieldType) ?? new Set<string>([]);
+        const allowedKeys = new Set<string>([...fieldKeys, ...UniversalFieldKeys]);
+        if (!allowedKeys.has(field.key)) {
+          // FIXME: Move this to $onValidate
+          const program = this.emitter.getProgram();
+          reportDiagnostic(program, {
+            code: "invalid-field-value",
+            format: {
+              fieldName: fieldType,
+              value: field.key,
+            },
+            target: NoTarget,
+          });
+        }
+        metadata[field.key] = field.value;
+      }
+    }
 
     // delete any undefined values
     for (const [key, val] of Object.entries(metadata)) {
@@ -288,7 +385,7 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
     if (property.type.kind === "Intrinsic" && property.type.name === "never") return code``;
 
     builder.push(code`${this.transformReservedName(this.toSnakeCase(property.name))} = ${type}`);
-    this.#emitFieldParameters(builder, property);
+    this.#emitFieldParameters(builder, property, type);
     builder.push(code`\n`);
     this.emitDocs(builder, property);
     return builder.reduce();
@@ -326,7 +423,8 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
   enumMember(member: EnumMember): EmitterOutput<string> {
     const builder = new StringBuilder();
     builder.push(code`${this.toSnakeCase(member.name).toUpperCase()}`);
-    this.#emitFieldParameters(builder, member);
+    // FIXME: See if this applicable to enums
+    //this.#emitFieldParameters(builder, member);
     builder.push(code`\n`);
     this.emitDocs(builder, member);
     return builder.reduce();
@@ -368,7 +466,8 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
       builder.push(code`${baseScalarName}, `);
     }
 
-    this.#emitFieldParameters(builder, scalar, sourceFile);
+    // FIXME: See if this applicable to scalars
+    // this.#emitFieldParameters(builder, scalar, sourceFile);
     builder.push(code`]`);
     return builder.reduce();
   }
@@ -420,7 +519,6 @@ export class DjangoEmitter extends PythonPartialModelEmitter {
     if (scalar.namespace !== undefined) {
       const namespaceName = getNamespaceFullName(scalar.namespace);
       if (namespaceName === "TypeSpec") {
-        // FIXME: This needs to emit the whole field defintion?
         return this.#scalarToFieldName(converted);
       }
     }

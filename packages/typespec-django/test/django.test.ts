@@ -1,7 +1,7 @@
-import { expectDiagnosticEmpty } from "@typespec/compiler/testing";
+import { expectDiagnosticEmpty, expectDiagnostics } from "@typespec/compiler/testing";
 import { djangoOutputFor } from "./test-host.js";
 import { strictEqual } from "assert";
-import { checkImports, compare } from "typespec-python/testing";
+import { compare } from "typespec-python/testing";
 
 describe("typespec-django: core", () => {
   describe("namespaces", () => {
@@ -1163,21 +1163,32 @@ describe("typespec-django: core", () => {
       it("can be used multiple times", async () => {
         const input = `
           model Widget {
-              @field("kw_only", true)
-              @field("title", "The Widget of Oz")
+              @field("verboseName", "The Widget of Oz")
+              @field("unique", true)
               name: string;
-
-              @field("max_digits", 5)
-              @field("decimal_places", 2)
-              cost: float;
           };`;
         const expect = `
           class Widget(models.Model):
-              name: str = Field(title="The Widget of Oz", kw_only=True)
-              cost: float = Field(decimal_places=2, max_digits=5)`;
+              name = models.CharField(unique=True, verbose_name="The Widget of Oz")`;
         const [result, diagnostics] = await djangoOutputFor(input);
         expectDiagnosticEmpty(diagnostics);
         compare(expect, result[0].contents);
+      });
+
+      it("raise diagnostic for unsupported key", async () => {
+        const input = `
+          model Widget {
+              @field("wangdilla", "The Widget of Oz")
+              name: string;
+          };`;
+        const [_, diagnostics] = await djangoOutputFor(input);
+        expectDiagnostics(diagnostics, [
+          {
+            code: "typespec-django/invalid-field-value",
+            severity: "error",
+            message: "Invalid field value 'wangdilla' for 'CharField'.",
+          },
+        ]);
       });
     });
   });
