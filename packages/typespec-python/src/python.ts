@@ -15,7 +15,6 @@ import {
   getDoc,
   getNamespaceFullName,
   getService,
-  navigateProgram,
 } from "@typespec/compiler";
 import {
   AssetEmitter,
@@ -43,6 +42,11 @@ interface UnionVariantMetadata {
   value: string | StringBuilder;
 }
 
+export enum EmitMode {
+  Namespace,
+  Program,
+}
+
 export const GlobalNamespace = Symbol.for("GlobalNamespace");
 
 export abstract class PythonPartialEmitter extends CodeTypeEmitter {
@@ -50,32 +54,18 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
 
   public declarations?: DeclarationManager;
 
+  public mode: EmitMode = EmitMode.Program;
+
   constructor(emitter: AssetEmitter<string, Record<string, never>>) {
     super(emitter);
     this.imports = new ImportManager(emitter);
   }
 
   protected createProgramContext(fileName: string): Context {
-    const program = this.getProgram();
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const emitter = this;
-    let hasServiceNamespace = false;
-    navigateProgram(program, {
-      namespace(ns) {
-        if (emitter.isInServiceNamespace(ns)) {
-          hasServiceNamespace = true;
-          return;
-        }
-      },
-    });
-    // Only create a program context if the TypeSpec does not use any service namespaces.
-    // Otherwise, we create namespace contexts.
-    if (hasServiceNamespace) {
-      return {};
-    }
     const options = this.emitter.getOptions();
     const resolvedFileName = options["output-file"] ?? fileName;
     const sourceFile = this.emitter.createSourceFile(resolvedFileName);
+    sourceFile.meta["kind"] = "program";
     return {
       scope: sourceFile.globalScope,
     };
@@ -93,8 +83,12 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   protected createNamespaceContext(namespace: Namespace, fileName: string): Context {
     // only create namespace context when the namespace is part of the service
     const omitAll = !this.isInServiceNamespace(namespace);
+    if (!omitAll) {
+      this.mode = EmitMode.Namespace;
+    }
     const file = this.emitter.createSourceFile(this.buildFilePath(namespace, fileName));
     file.meta["omitAll"] = omitAll;
+    file.meta["kind"] = "namespace";
     return {
       scope: file.globalScope,
       omitAll: omitAll,
@@ -111,9 +105,6 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
 
     // create a shallow copy of the map to avoid modifying the original
     const sourceFiles = [...map.values()];
-    // ensure there are declarations to emit. Otherwise, don't create the file
-    const allDecls = sourceFiles.map((sf) => this.declarations!.get({ sourceFile: sf })).flat();
-    if (allDecls.length === 0) return undefined;
 
     // createSourceFile prepends emitterOutputDir to the path, so remove it, if present.
     let rootPath = rootPaths[0];
@@ -656,7 +647,15 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
    * a shallow copy of the SourceFiles array to prevent mutation.
    */
   getSourceFiles(): SourceFile<string>[] {
-    return [...this.emitter.getSourceFiles()];
+    const allSourceFiles = [...this.emitter.getSourceFiles()];
+    switch (this.mode) {
+      case EmitMode.Program:
+        return allSourceFiles.filter((sf) => sf.meta["kind"] === "program");
+      case EmitMode.Namespace:
+        return allSourceFiles.filter((sf) => sf.meta["omitAll"] === false && sf.meta["kind"] === "namespace");
+      default:
+        throw new Error("Unknown emit mode");
+    }
   }
 
   /** Returns the current source file context, or undefined. */

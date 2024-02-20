@@ -182,6 +182,10 @@ export abstract class PythonPartialOperationEmitter extends PythonPartialEmitter
   }
 
   async buildImplementationFile(sourceFile: SourceFile<string>): Promise<EmittedSourceFile | undefined> {
+    // Don't create a file if there are no declarations for the file
+    const decls = this.declarations!.get({ kind: DeclarationKind.Operation, sourceFile: sourceFile });
+    if (decls.length === 0) return undefined;
+
     const pathRoot = sourceFile.path.split("/").slice(0, -1).join("/");
     let path = `${pathRoot}/_operations.py`;
     try {

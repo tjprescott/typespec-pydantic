@@ -206,12 +206,11 @@ describe("typespec-flask: core", () => {
       const [results, diagnostics] = await flaskOutputFor(input);
       expectDiagnosticEmpty(diagnostics);
       // verify files are created at the right paths
-      strictEqual(results.length, 4);
-      // verify paths
       strictEqual(results[0].path, "typespec-flask/foo_service/bar/operations.py");
       strictEqual(results[1].path, "typespec-flask/foo_service/bar/__init__.py");
       strictEqual(results[2].path, "typespec-flask/foo_service/bar/_operations.py");
       strictEqual(results[3].path, "typespec-flask/foo_service/__init__.py");
+      strictEqual(results.length, 4);
 
       // verify file contents
       compare(barOpExpect, results[0].contents, false);
