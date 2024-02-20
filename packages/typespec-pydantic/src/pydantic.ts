@@ -47,13 +47,12 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
   await emitter.writeAllOutput();
   if (!emitter.getProgram().compilerOptions.noEmit) {
     for (const sourceFile of emitter.getSourceFiles()) {
-      if (sourceFile.globalScope.declarations.length > 0) {
-        const initFile = await emitter.buildInitFile(new Map([[sourceFile.path, sourceFile]]));
-        if (initFile !== undefined)
-          await emitFile(emitter.getProgram(), {
-            path: initFile.path,
-            content: initFile.contents,
-          });
+      const initFile = await emitter.buildInitFile(new Map([[sourceFile.path, sourceFile]]));
+      if (initFile !== undefined) {
+        await emitFile(emitter.getProgram(), {
+          path: initFile.path,
+          content: initFile.contents,
+        });
       }
     }
   }

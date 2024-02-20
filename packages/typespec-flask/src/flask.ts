@@ -32,15 +32,12 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
         content: initFile.contents,
       });
     }
-    const declarations = emitter.declarations!.get({ sourceFile: sourceFile, kind: DeclarationKind.Operation });
-    if (declarations.length > 0) {
-      const implFile = await emitter.buildImplementationFile(sourceFile);
-      if (implFile !== undefined) {
-        await emitFile(emitter.getProgram(), {
-          path: implFile.path,
-          content: implFile.contents,
-        });
-      }
+    const implFile = await emitter.buildImplementationFile(sourceFile);
+    if (implFile !== undefined) {
+      await emitFile(emitter.getProgram(), {
+        path: implFile.path,
+        content: implFile.contents,
+      });
     }
   }
 }

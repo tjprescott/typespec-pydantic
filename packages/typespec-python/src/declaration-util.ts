@@ -43,6 +43,7 @@ export class DeclarationManager {
   private declarations = new Map<string | typeof GlobalNamespace, DeclarationMetadata>();
 
   declare(emitter: PythonPartialEmitter, options: DeclarationOptions): Declaration<string> {
+    const context = emitter.getContext();
     const sf = options.sourceFile ?? emitter.getSourceFile();
     const decl = emitter.declaration(options.name, options.value ?? "");
     decl.meta["omit"] = options.omit;
@@ -53,7 +54,7 @@ export class DeclarationManager {
       kind: options.kind,
       importPath: importPath,
       decl: decl,
-      omit: options.omit,
+      omit: context.omitAll || options.omit,
       source: undefined,
       sourceFile: sf,
       globalImportPath: options.globalImportPath,

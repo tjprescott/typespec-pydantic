@@ -92,12 +92,11 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
 
   protected createNamespaceContext(namespace: Namespace, fileName: string): Context {
     // only create namespace context when the namespace is part of the service
-    if (!this.isInServiceNamespace(namespace)) {
-      return {};
-    }
+    const omitAll = !this.isInServiceNamespace(namespace);
     const file = this.emitter.createSourceFile(this.buildFilePath(namespace, fileName));
     return {
       scope: file.globalScope,
+      omitAll: omitAll,
     };
   }
 
@@ -108,6 +107,12 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     if (!areAllPathsEqual) {
       throw new Error("All paths must have the same root path");
     }
+
+    // create a shallow copy of the map to avoid modifying the original
+    const sourceFiles = [...map.values()];
+    // ensure there are declarations to emit. Otherwise, don't create the file
+    const allDecls = sourceFiles.map((sf) => this.declarations!.get({ sourceFile: sf })).flat();
+    if (allDecls.length === 0) return undefined;
 
     // createSourceFile prepends emitterOutputDir to the path, so remove it, if present.
     let rootPath = rootPaths[0];
@@ -122,8 +127,6 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     const builder = new StringBuilder();
     const all = new Set<string>();
 
-    // create a shallow copy of the map to avoid modifying the original
-    const sourceFiles = [...map.values()];
     for (const sf of sourceFiles) {
       const decls = this.declarations?.get({
         sourceFile: sf,
@@ -682,5 +685,15 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   /** Helper method to call none from the underlying asset emitter. */
   skip(): NoEmit {
     return this.emitter.result.none();
+  }
+
+  /** Helper method to get the context. */
+  getContext(): Context {
+    return this.emitter.getContext();
+  }
+
+  /** Return the asset emitter so you can call any methods. */
+  getAssetEmitter(): AssetEmitter<string, Record<string, never>> {
+    return this.emitter;
   }
 }
