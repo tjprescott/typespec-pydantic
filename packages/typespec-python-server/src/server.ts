@@ -137,8 +137,10 @@ export class PythonServerEmitter extends PythonPartialEmitter {
 
   /** Matches models.py and operations.py files */
   matchSourceFiles(modelFiles: SourceFile<string>[], operationFiles: SourceFile<string>[]): Map<string, FilePair> {
+    // remove omitted files
+    const nonOmittedFiles = [...modelFiles, ...operationFiles].filter((sf) => sf.meta["omitAll"] === false);
     const matchedFiles = new Map<string, FilePair>();
-    for (const sf of [...modelFiles, ...operationFiles]) {
+    for (const sf of nonOmittedFiles) {
       // filter out empty files
       if (sf.globalScope.declarations.length === 0) continue;
       const path = sf.path;

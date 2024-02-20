@@ -81,7 +81,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     };
   }
 
-  private isInServiceNamespace(namespace: Namespace): boolean {
+  public isInServiceNamespace(namespace: Namespace): boolean {
     if (getService(this.getProgram(), namespace) !== undefined) {
       return true;
     } else if (namespace.namespace !== undefined) {
@@ -94,6 +94,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     // only create namespace context when the namespace is part of the service
     const omitAll = !this.isInServiceNamespace(namespace);
     const file = this.emitter.createSourceFile(this.buildFilePath(namespace, fileName));
+    file.meta["omitAll"] = omitAll;
     return {
       scope: file.globalScope,
       omitAll: omitAll,
