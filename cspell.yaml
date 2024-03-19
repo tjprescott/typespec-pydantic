@@ -12,6 +12,7 @@ words:
   - regen
   - keyer
   - Interner
+  - swappable
 ignorePaths:
   - "**/node_modules/**"
   - "**/dist/**"

@@ -105,7 +105,7 @@ export class DjangoOperationEmitter extends PythonPartialOperationEmitter {
     let path = httpOperation[0].path;
     const verb = httpOperation[0].verb;
     path = path.replace(/{/g, "<").replace(/}/g, ">");
-    builder.push(`@require_http_methods(["${verb.toUpperCase()}"])`);
+    builder.push(`@require_http_methods(["${verb.toUpperCase()}"])\n`);
     const pythonName = this.transformReservedName(this.toSnakeCase(operation.name));
     this.paths.push({
       url: path,

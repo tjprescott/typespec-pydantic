@@ -1,13 +1,5 @@
+import { ImportKind, DeclarationKind, PythonPartialModelEmitter, GlobalNamespace } from "typespec-python";
 import {
-  ImportKind,
-  DeclarationManager,
-  DeclarationKind,
-  PythonPartialModelEmitter,
-  createEmitters,
-  GlobalNamespace,
-} from "typespec-python";
-import {
-  EmitContext,
   Enum,
   EnumMember,
   Model,
@@ -16,7 +8,6 @@ import {
   Scalar,
   Type,
   Union,
-  emitFile,
   getDoc,
   getKeyName,
   getKnownValues,
@@ -27,24 +18,6 @@ import {
 import { EmitterOutput, Placeholder, SourceFile, StringBuilder, code } from "@typespec/compiler/emitter-framework";
 import { getFields } from "./decorators.js";
 import { reportDiagnostic } from "./lib.js";
-
-export async function $onEmit(context: EmitContext<Record<string, never>>) {
-  const emitter = createEmitters(context.program, DjangoModelEmitter, context)[0] as DjangoModelEmitter;
-  emitter.declarations = new DeclarationManager();
-  emitter.emitProgram({ emitTypeSpecNamespace: false });
-  await emitter.writeAllOutput();
-  if (!emitter.getProgram().compilerOptions.noEmit) {
-    for (const sourceFile of emitter.getSourceFiles()) {
-      const initFile = await emitter.buildInitFile(new Map([[sourceFile.path, sourceFile]]));
-      if (initFile !== undefined) {
-        await emitFile(emitter.getProgram(), {
-          path: initFile.path,
-          content: initFile.contents,
-        });
-      }
-    }
-  }
-}
 
 // FIXME: Move validation here
 // export function $onValidate(context: EmitContext<Record<string, never>>) {
