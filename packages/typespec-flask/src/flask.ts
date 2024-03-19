@@ -1,4 +1,4 @@
-import { DeclarationManager, EmitMode, ImportKind, PythonPartialOperationEmitter } from "typespec-python";
+import { DeclarationManager, ImportKind, PythonPartialOperationEmitter } from "typespec-python";
 import { EmitContext, Operation, Scalar, emitFile, getNamespaceFullName } from "@typespec/compiler";
 import {
   EmittedSourceFile,
