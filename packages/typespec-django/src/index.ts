@@ -2,6 +2,7 @@ import { EmitContext, emitFile } from "@typespec/compiler";
 import { DeclarationManager, PythonPartialEmitter, createEmitters } from "typespec-python";
 import { DjangoModelEmitter } from "./django-models.js";
 import { DjangoOperationEmitter } from "./django.js";
+import { SourceFile } from "@typespec/compiler/emitter-framework";
 
 // Re-export $lib to the compiler can get access to it and register your library correctly.
 export { $lib } from "./lib.js";
@@ -42,7 +43,6 @@ export async function $onEmit(context: EmitContext<Record<string, never>>) {
 }
 
 async function emitFullOutput(context: EmitContext<Record<string, never>>) {
-  const options = context.options;
   const modelEmitter = createEmitters(context.program, DjangoModelEmitter, context)[0] as DjangoModelEmitter;
   const operationEmitter = createEmitters(
     context.program,
@@ -52,15 +52,12 @@ async function emitFullOutput(context: EmitContext<Record<string, never>>) {
   const declarations = new DeclarationManager();
   modelEmitter.declarations = declarations;
   operationEmitter.declarations = declarations;
-  serverEmitter.modelEmitter = modelEmitter;
-  serverEmitter.operationEmitter = operationEmitter;
-
   modelEmitter.emitProgram();
   operationEmitter.emitProgram();
   await modelEmitter.writeAllOutput();
   await operationEmitter.writeAllOutput();
-  if (!serverEmitter.getProgram().compilerOptions.noEmit) {
-    const matchedFiles = serverEmitter.matchSourceFiles(
+  if (!context.program.compilerOptions.noEmit) {
+    const matchedFiles = modelEmitter.matchSourceFiles(
       modelEmitter.getSourceFiles(),
       operationEmitter.getSourceFiles(),
     );
@@ -73,9 +70,9 @@ async function emitFullOutput(context: EmitContext<Record<string, never>>) {
       const map = new Map<string, SourceFile<string>>();
       map.set(model.path, model);
       map.set(operation.path, operation);
-      const initFile = await serverEmitter.buildInitFile(map);
+      const initFile = await modelEmitter.buildInitFile(map);
       if (initFile === undefined) continue;
-      await emitFile(serverEmitter.getProgram(), {
+      await emitFile(context.program, {
         path: initFile.path,
         content: initFile.contents,
       });

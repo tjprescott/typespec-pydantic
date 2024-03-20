@@ -8,11 +8,6 @@ import {
   createEmitters,
 } from "typespec-python";
 
-interface FilePair {
-  model?: SourceFile<string>;
-  operation?: SourceFile<string>;
-}
-
 async function loadModelEmitter(
   packageName: string,
   context: EmitContext<Record<string, never>>,
@@ -133,29 +128,5 @@ export class PythonServerEmitter extends PythonPartialEmitter {
 
   emitScalar(scalar: Scalar, name: string, sourceFile?: SourceFile<string> | undefined): string | Placeholder<string> {
     throw new Error("Method not implemented.");
-  }
-
-  /** Matches models.py and operations.py files */
-  matchSourceFiles(modelFiles: SourceFile<string>[], operationFiles: SourceFile<string>[]): Map<string, FilePair> {
-    // remove omitted files
-    const nonOmittedFiles = [...modelFiles, ...operationFiles].filter((sf) => sf.meta["omitAll"] === false);
-    const matchedFiles = new Map<string, FilePair>();
-    for (const sf of nonOmittedFiles) {
-      // filter out empty files
-      if (sf.globalScope.declarations.length === 0) continue;
-      const path = sf.path;
-      const folder = path.substring(0, path.lastIndexOf("/"));
-      if (!matchedFiles.has(folder)) {
-        matchedFiles.set(folder, {});
-      }
-      if (path.endsWith("models.py")) {
-        matchedFiles.get(folder)!.model = sf;
-      } else if (path.endsWith("operations.py")) {
-        matchedFiles.get(folder)!.operation = sf;
-      } else {
-        throw new Error(`Unexpected file ${path}`);
-      }
-    }
-    return matchedFiles;
   }
 }

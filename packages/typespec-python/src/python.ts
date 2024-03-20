@@ -42,6 +42,11 @@ interface UnionVariantMetadata {
   value: string | StringBuilder;
 }
 
+interface FilePair {
+  model?: SourceFile<string>;
+  operation?: SourceFile<string>;
+}
+
 export enum EmitMode {
   Namespace,
   Program,
@@ -93,6 +98,30 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
       scope: file.globalScope,
       omitAll: omitAll,
     };
+  }
+
+  /** Matches models.py and operations.py files */
+  matchSourceFiles(modelFiles: SourceFile<string>[], operationFiles: SourceFile<string>[]): Map<string, FilePair> {
+    // remove omitted files
+    const nonOmittedFiles = [...modelFiles, ...operationFiles].filter((sf) => sf.meta["omitAll"] === false);
+    const matchedFiles = new Map<string, FilePair>();
+    for (const sf of nonOmittedFiles) {
+      // filter out empty files
+      if (sf.globalScope.declarations.length === 0) continue;
+      const path = sf.path;
+      const folder = path.substring(0, path.lastIndexOf("/"));
+      if (!matchedFiles.has(folder)) {
+        matchedFiles.set(folder, {});
+      }
+      if (path.endsWith("models.py")) {
+        matchedFiles.get(folder)!.model = sf;
+      } else if (path.endsWith("operations.py")) {
+        matchedFiles.get(folder)!.operation = sf;
+      } else {
+        throw new Error(`Unexpected file ${path}`);
+      }
+    }
+    return matchedFiles;
   }
 
   async buildInitFile(map: Map<string, SourceFile<string>>): Promise<EmittedSourceFile | undefined> {
