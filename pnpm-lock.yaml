@@ -174,6 +174,9 @@ importers:
       '@typespec/versioning':
         specifier: ^0.52.0
         version: 0.52.0(@typespec/compiler@0.52.0)
+      typespec-django:
+        specifier: workspace:~1.0.0-beta.1
+        version: link:../typespec-django
       typespec-flask:
         specifier: workspace:~1.0.0-beta.1
         version: link:../typespec-flask

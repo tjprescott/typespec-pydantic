@@ -2,6 +2,7 @@ import { JSONSchemaType, createTypeSpecLibrary, paramMessage } from "@typespec/c
 
 export interface DjangoEmitterOptions {
   "output-file"?: string;
+  "emit-kind": "models" | "operations" | "full";
 }
 
 const DjangoEmitterOptionsSchema: JSONSchemaType<DjangoEmitterOptions> = {
@@ -9,6 +10,7 @@ const DjangoEmitterOptionsSchema: JSONSchemaType<DjangoEmitterOptions> = {
   additionalProperties: false,
   properties: {
     "output-file": { type: "string", nullable: true },
+    "emit-kind": { type: "string", enum: ["models", "operations", "full"], default: "full" },
   },
   required: [],
 };
