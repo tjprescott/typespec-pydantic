@@ -573,6 +573,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   }
 
   emitTypeReference(type: Type) {
+    console.log("emitTypeReference", type.kind, (type as any).name);
     const destNs = this.importPathForNamespace((type as Model).namespace);
     if (destNs !== "type_spec") {
       if (type.kind === "Model") {
@@ -650,6 +651,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     scope: Scope<string> | undefined,
     cycle: ReferenceCycle,
   ): string | EmitEntity<string> {
+    console.log("circularReference", target, scope, cycle);
     if (scope?.kind === "sourceFile" && target.kind === "declaration") {
       const targetName = target.name;
       const targetPath = this.buildNamespaceFromScope(target.scope);

@@ -15,7 +15,14 @@ import {
   getNamespaceFullName,
   getVisibility,
 } from "@typespec/compiler";
-import { EmitterOutput, Placeholder, SourceFile, StringBuilder, code } from "@typespec/compiler/emitter-framework";
+import {
+  Context,
+  EmitterOutput,
+  Placeholder,
+  SourceFile,
+  StringBuilder,
+  code,
+} from "@typespec/compiler/emitter-framework";
 import { getFields } from "./decorators.js";
 import { reportDiagnostic } from "./lib.js";
 
@@ -267,6 +274,7 @@ export class DjangoModelEmitter extends PythonPartialModelEmitter {
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
+    console.log(`modelDeclaration: ${name}`);
     const builder = new StringBuilder();
     const baseModel = model.baseModel?.name ?? "models.Model";
     if (baseModel === "models.Model") {
@@ -292,6 +300,7 @@ export class DjangoModelEmitter extends PythonPartialModelEmitter {
   }
 
   modelLiteral(model: Model): EmitterOutput<string> {
+    console.log(`modelLiteral: ${model.name}`);
     // Unsupported. See: `anonymous-model` rule
     return code`object`;
   }
@@ -307,6 +316,7 @@ export class DjangoModelEmitter extends PythonPartialModelEmitter {
   }
 
   modelInstantiation(model: Model, name: string | undefined): EmitterOutput<string> {
+    console.log(`modelInstantiation: ${name}`);
     if (model.name === "Record") {
       const type = model.templateMapper?.args[0];
       this.imports.add("typing", "Dict");
@@ -335,6 +345,7 @@ export class DjangoModelEmitter extends PythonPartialModelEmitter {
   }
 
   modelPropertyLiteral(property: ModelProperty): EmitterOutput<string> {
+    console.log(`modelPropertyLiteral: ${property.name}`);
     const builder = new StringBuilder();
     let type: string | StringBuilder | undefined = undefined;
     type = this.emitTypeReference(property.type);
@@ -362,6 +373,7 @@ export class DjangoModelEmitter extends PythonPartialModelEmitter {
   }
 
   modelPropertyReference(property: ModelProperty): EmitterOutput<string> {
+    console.log(`modelPropertyReference: ${property.name}`);
     return code`${this.emitTypeReference(property.type)}`;
   }
 

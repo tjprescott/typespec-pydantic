@@ -28,16 +28,6 @@ import {
   getPattern,
   getVisibility,
 } from "@typespec/compiler";
-import {
-  EmitEntity,
-  EmitterOutput,
-  Placeholder,
-  ReferenceCycle,
-  Scope,
-  SourceFile,
-  StringBuilder,
-  code,
-} from "@typespec/compiler/emitter-framework";
 import { getFields } from "./decorators.js";
 
 export async function $onEmit(context: EmitContext<Record<string, never>>) {
