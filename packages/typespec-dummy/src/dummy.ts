@@ -296,47 +296,73 @@ export class DummyEmitter extends CodeTypeEmitter {
 
   booleanLiteral(boolean: BooleanLiteral): EmitterOutput<string> {
     console.log(`booleanLiteral: ${boolean.value}`);
-    return super.booleanLiteral(boolean);
+    return code`[Literal ${boolean.value.toString()}]`;
   }
 
   enumDeclaration(en: Enum, name: string): EmitterOutput<string> {
+    const context = this.emitter.getContext();
+    const scope = context.scope;
     console.log(`enumDeclaration: ${name}`);
-    return super.enumDeclaration(en, name);
+    const builder = new StringBuilder();
+    builder.push(code`[Enum ${name}] {${scope.name}}`);
+    builder.push(code`${this.emitter.emitEnumMembers(en)}`);
+    return this.emitter.result.declaration(name, builder.reduce());
   }
 
   enumMember(member: EnumMember): EmitterOutput<string> {
     console.log(`enumMember: ${member.name}`);
-    return super.enumMember(member);
+    return code`[EnumMember ${member.name}]`;
   }
 
   enumMemberReference(member: EnumMember): EmitterOutput<string> {
     console.log(`enumMemberReference: ${member.name}`);
-    return super.enumMemberReference(member);
+    return code`[EnumMemberRef ${member.enum.name}.${member.name}]`;
   }
 
   enumMembers(en: Enum): EmitterOutput<string> {
     console.log(`enumMembers: ${en.name}`);
-    return super.enumMembers(en);
+    const builder = new StringBuilder();
+    this.indent += 2;
+    for (const member of en.members.values()) {
+      builder.push(code`\n${this.ind()}${this.emitter.emitType(member)}`);
+    }
+    this.indent -= 2;
+    return builder.reduce();
   }
 
   interfaceDeclaration(iface: Interface, name: string): EmitterOutput<string> {
+    const context = this.emitter.getContext();
+    const scope = context.scope;
     console.log(`interfaceDeclaration: ${name}`);
-    return super.interfaceDeclaration(iface, name);
+    const builder = new StringBuilder();
+    builder.push(code`[Interface ${name}] {${scope.name}}`);
+    builder.push(code`${this.emitter.emitInterfaceOperations(iface)}`);
+    return this.emitter.result.declaration(name, builder.reduce());
   }
 
   interfaceDeclarationOperations(iface: Interface): EmitterOutput<string> {
     console.log(`interfaceDeclarationOperations: ${iface.name}`);
-    return super.interfaceDeclarationOperations(iface);
+    this.indent += 2;
+    const builder = new StringBuilder();
+    for (const operation of iface.operations.values()) {
+      builder.push(code`\n${this.ind()}${this.emitter.emitType(operation)}`);
+    }
+    this.indent -= 2;
+    return builder.reduce();
   }
 
   interfaceOperationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
     console.log(`interfaceOperationDeclaration: ${name}`);
-    return super.interfaceOperationDeclaration(operation, name);
+    const builder = new StringBuilder();
+    builder.push(code`[Operation ${name}]`);
+    builder.push(code`${this.emitter.emitOperationParameters(operation)}`);
+    builder.push(code`${this.emitter.emitOperationReturnType(operation)}`);
+    return this.emitter.result.declaration(name, builder.reduce());
   }
 
   intrinsic(intrinsic: IntrinsicType, name: string): EmitterOutput<string> {
     console.log(`intrinsic: ${name}`);
-    return super.intrinsic(intrinsic, name);
+    return code`[Intrinsic ${name}]`;
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
@@ -352,11 +378,13 @@ export class DummyEmitter extends CodeTypeEmitter {
     return this.emitter.result.declaration(name, builder.reduce());
   }
 
+  // TODO
   modelInstantiation(model: Model, name: string | undefined): EmitterOutput<string> {
     console.log(`modelInstantiation: ${name}`);
     return super.modelInstantiation(model, name);
   }
 
+  // TODO
   modelLiteral(model: Model): EmitterOutput<string> {
     console.log(`modelLiteral: ${model.name}`);
     return super.modelLiteral(model);
@@ -384,7 +412,7 @@ export class DummyEmitter extends CodeTypeEmitter {
 
   modelPropertyReference(property: ModelProperty): EmitterOutput<string> {
     console.log(`modelPropertyReference: ${property.name}`);
-    return super.modelPropertyReference(property);
+    return code`[ModelPropertyRef ${property.model?.name ?? "anonymous"}.${property.name}]`;
   }
 
   /** This requires you to construct the namespace by directing the sequencing. You build up the code contents. */
@@ -429,22 +457,37 @@ export class DummyEmitter extends CodeTypeEmitter {
 
   numericLiteral(number: NumericLiteral): EmitterOutput<string> {
     console.log(`numericLiteral: ${number.value}`);
-    return super.numericLiteral(number);
+    return code`[Literal ${number.value.toString()}]`;
   }
 
   operationDeclaration(operation: Operation, name: string): EmitterOutput<string> {
+    const context = this.emitter.getContext();
+    const scope = context.scope;
     console.log(`operationDeclaration: ${name}`);
-    return super.operationDeclaration(operation, name);
+    const builder = new StringBuilder();
+    builder.push(code`[Operation ${name}] {${scope.name}}`);
+    builder.push(code`${this.emitter.emitOperationParameters(operation)}`);
+    builder.push(code`${this.emitter.emitOperationReturnType(operation)}`);
+    return builder.reduce();
   }
 
   operationParameters(operation: Operation, parameters: Model): EmitterOutput<string> {
     console.log(`operationParameters: ${operation.name}`);
-    return super.operationParameters(operation, parameters);
+    const builder = new StringBuilder();
+    this.indent += 2;
+    for (const param of parameters.properties.values()) {
+      builder.push(code`\n${this.ind()}[Param ${this.emitter.emitModelProperty(param)}]`);
+    }
+    this.indent -= 2;
+    return builder.reduce();
   }
 
   operationReturnType(operation: Operation, returnType: Type): EmitterOutput<string> {
     console.log(`operationReturnType: ${operation.name}`);
-    return super.operationReturnType(operation, returnType);
+    this.indent += 2;
+    const val = code`\n${this.ind()}[Return ${this.emitter.emitType(returnType)}]`;
+    this.indent -= 2;
+    return val;
   }
 
   scalarDeclaration(scalar: Scalar, name: string): EmitterOutput<string> {
@@ -457,6 +500,7 @@ export class DummyEmitter extends CodeTypeEmitter {
     return builder.reduce();
   }
 
+  // TODO
   scalarInstantiation(scalar: Scalar, name: string | undefined): EmitterOutput<string> {
     console.log(`scalarInstantiation: ${name}`);
     return super.scalarInstantiation(scalar, name);
@@ -464,9 +508,10 @@ export class DummyEmitter extends CodeTypeEmitter {
 
   stringLiteral(string: StringLiteral): EmitterOutput<string> {
     console.log(`stringLiteral: ${string.value}`);
-    return super.stringLiteral(string);
+    return code`[Literal "${string.value}"]`;
   }
 
+  // TODO
   stringTemplate(stringTemplate: StringTemplate): EmitterOutput<string> {
     console.log(`stringTemplate: ${stringTemplate}`);
     return super.stringTemplate(stringTemplate);
@@ -474,19 +519,33 @@ export class DummyEmitter extends CodeTypeEmitter {
 
   tupleLiteral(tuple: Tuple): EmitterOutput<string> {
     console.log(`tupleLiteral: ${tuple.values}`);
-    return super.tupleLiteral(tuple);
+    const builder = new StringBuilder();
+    builder.push(code`[Tuple ${this.emitter.emitTupleLiteralValues(tuple)}]`);
+    return builder.reduce();
   }
 
   tupleLiteralValues(tuple: Tuple): EmitterOutput<string> {
     console.log(`tupleLiteralValues: ${tuple.values}`);
-    return super.tupleLiteralValues(tuple);
+    const builder = new StringBuilder();
+    this.indent += 2;
+    for (const value of tuple.values) {
+      builder.push(code`\n${this.ind()}${this.emitter.emitType(value)}`);
+    }
+    this.indent -= 2;
+    return builder.reduce();
   }
 
   unionDeclaration(union: Union, name: string): EmitterOutput<string> {
+    const context = this.emitter.getContext();
+    const scope = context.scope;
     console.log(`unionDeclaration: ${name}`);
-    return super.unionDeclaration(union, name);
+    const builder = new StringBuilder();
+    builder.push(code`[Union ${name}] {${scope.name}}`);
+    builder.push(code`${this.emitter.emitUnionVariants(union)}`);
+    return this.emitter.result.declaration(name, builder.reduce());
   }
 
+  // TODO
   unionInstantiation(union: Union, name: string): EmitterOutput<string> {
     console.log(`unionInstantiation: ${name}`);
     return super.unionInstantiation(union, name);
@@ -494,16 +553,24 @@ export class DummyEmitter extends CodeTypeEmitter {
 
   unionLiteral(union: Union): EmitterOutput<string> {
     console.log(`unionLiteral: ${union.name}`);
-    return super.unionLiteral(union);
+    const builder = new StringBuilder();
+    builder.push(code`[Literal ${this.emitter.emitUnionVariants(union)}]`);
+    return builder.reduce();
   }
 
   unionVariant(variant: UnionVariant): EmitterOutput<string> {
     console.log(`unionVariant: ${String(variant.name) ?? "unknown"}`);
-    return super.unionVariant(variant);
+    return code`[UnionVariant ${this.emitter.emitTypeReference(variant.type)}]`;
   }
 
   unionVariants(union: Union): EmitterOutput<string> {
     console.log(`unionVariants: ${union.name}`);
-    return super.unionVariants(union);
+    const builder = new StringBuilder();
+    this.indent += 2;
+    for (const variant of union.variants.values()) {
+      builder.push(code`\n${this.ind()}${this.emitter.emitType(variant)}`);
+    }
+    this.indent -= 2;
+    return builder.reduce();
   }
 }
