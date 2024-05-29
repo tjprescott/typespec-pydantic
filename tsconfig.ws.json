@@ -5,7 +5,8 @@
     { "path": "packages/playground-website/tsconfig.json" },
     { "path": "packages/typespec-python-server/tsconfig.json" },
     { "path": "packages/typespec-python/tsconfig.json" },
-    { "path": "packages/typespec-django/tsconfig.json" }
+    { "path": "packages/typespec-django/tsconfig.json" },
+    { "path": "packages/typespec-dummy/tsconfig.json" }
   ],
   "files": []
 }

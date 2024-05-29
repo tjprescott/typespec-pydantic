@@ -1,8 +1,8 @@
 {
-  "name": "emitter-framework",
+  "name": "typespec-dummy",
   "version": "1.0.0-beta.1",
   "author": "Microsoft Corporation",
-  "description": "Emitter Framework v2",
+  "description": "Dummy emitter for TypeSpec",
   "homepage": "https://github.com/tjprescott/typespec-pydantic",
   "readme": "https://github.com/tjprescott/typespec-pydantic/blob/master/README.md",
   "license": "MIT",
@@ -14,10 +14,10 @@
     "url": "https://github.com/tjprescott/typespec-pydantic/issues"
   },
   "keywords": [
-    "typespec",
-    "python"
+    "typespec"
   ],
   "type": "module",
+  "tspMain": "lib/main.tsp",
   "main": "dist/src/index.js",
   "exports": {
     ".": {
@@ -29,7 +29,6 @@
       "types": "./dist/src/testing/index.d.ts"
     }
   },
-  "tspMain": "lib/main.tsp",
   "scripts": {
     "clean": "rimraf ./dist ./temp",
     "purge": "npm run clean && rimraf ./node_modules",
@@ -42,14 +41,12 @@
     "test": "mocha"
   },
   "peerDependencies": {
-    "@typespec/compiler": "^0.55.0",
-    "@typespec/http": "^0.55.0",
-    "@typespec/rest": "^0.55.0"
+    "typespec-python": "workspace:~1.0.0-beta.1",
+    "@typespec/compiler": "^0.52.0"
   },
   "devDependencies": {
-    "@typespec/compiler": "^0.55.0",
-    "@typespec/http": "^0.55.0",
-    "@typespec/rest": "^0.55.0",
+    "@typespec/compiler": "^0.52.0",
+    "typespec-python": "workspace:~1.0.0-beta.1",
     "@changesets/cli": "^2.27.1",
     "@types/node": "~18.11.9",
     "@typespec/prettier-plugin-typespec": "~0.50.0",

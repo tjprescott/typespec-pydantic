@@ -453,24 +453,29 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   }
 
   arrayLiteral(array: Model, elementType: Type): EmitterOutput<string> {
+    console.log(`arrayLiteral: ${array.name}`);
     this.imports.add("typing", "List");
     return code`List[${this.emitTypeReference(elementType)}]`;
   }
 
   booleanLiteral(boolean: BooleanLiteral): EmitterOutput<string> {
+    console.log(`booleanLiteral: ${boolean.value}`);
     const val = boolean.value ? "True" : "False";
     return code`${val}`;
   }
 
   numericLiteral(number: NumericLiteral): EmitterOutput<string> {
+    console.log(`numericLiteral: ${number.value}`);
     return code`${number.value.toString()}`;
   }
 
   stringLiteral(string: StringLiteral): EmitterOutput<string> {
+    console.log(`stringLiteral: ${string.value}`);
     return code`"${string.value}"`;
   }
 
   tupleLiteral(tuple: Tuple): EmitterOutput<string> {
+    console.log(`tupleLiteral: ${tuple}`);
     const builder = new StringBuilder();
     let i = 0;
     const length = tuple.values.length;
@@ -485,6 +490,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   }
 
   intrinsic(intrinsic: IntrinsicType, name: string): EmitterOutput<string> {
+    console.log(`intrinsic: ${name}`);
     switch (name) {
       case "never":
         // Unsupported: See `intrinsic-type-unsupported` rule
@@ -504,6 +510,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   }
 
   unionLiteral(union: Union): EmitterOutput<string> {
+    console.log(`unionLiteral: ${union.name ?? "anonymous"}`);
     return this.emitter.emitUnionVariants(union);
   }
 
@@ -514,6 +521,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
    * the literals will be listed first (`Union[Literal[...], ...]`).
    */
   unionVariants(union: Union): EmitterOutput<string> {
+    console.log(`unionVariants: ${union.name ?? "anonymous"}`);
     const builder = new StringBuilder();
     const literals: UnionVariantMetadata[] = [];
     const nonLiterals: UnionVariantMetadata[] = [];
@@ -573,7 +581,6 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
   }
 
   emitTypeReference(type: Type) {
-    console.log("emitTypeReference", type.kind, (type as any).name);
     const destNs = this.importPathForNamespace((type as Model).namespace);
     if (destNs !== "type_spec") {
       if (type.kind === "Model") {
@@ -651,7 +658,7 @@ export abstract class PythonPartialEmitter extends CodeTypeEmitter {
     scope: Scope<string> | undefined,
     cycle: ReferenceCycle,
   ): string | EmitEntity<string> {
-    console.log("circularReference", target, scope, cycle);
+    console.log(`python.ts circularReference: ${target}`);
     if (scope?.kind === "sourceFile" && target.kind === "declaration") {
       const targetName = target.name;
       const targetPath = this.buildNamespaceFromScope(target.scope);

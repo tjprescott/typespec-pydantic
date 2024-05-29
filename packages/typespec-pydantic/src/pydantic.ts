@@ -1,10 +1,10 @@
 import {
   ImportKind,
-  DeclarationManager,
   DeclarationKind,
   PythonPartialModelEmitter,
   createEmitters,
   GlobalNamespace,
+  DeclarationManager,
 } from "typespec-python";
 import {
   EmitContext,
@@ -27,8 +27,165 @@ import {
   getNamespaceFullName,
   getPattern,
   getVisibility,
+  navigateProgram,
 } from "@typespec/compiler";
 import { getFields } from "./decorators.js";
+import {
+  EmitEntity,
+  EmitterOutput,
+  Placeholder,
+  ReferenceCycle,
+  Scope,
+  SourceFile,
+  StringBuilder,
+  code,
+} from "@typespec/compiler/emitter-framework";
+
+function navigateProgramDebug(emitter: PydanticEmitter) {
+  navigateProgram(emitter.getProgram(), {
+    boolean: (node) => {
+      console.log("boolean", node);
+    },
+    decorator: (node) => {
+      console.log("decorator", node);
+    },
+    enum: (node) => {
+      console.log("enum", node);
+    },
+    enumMember: (node) => {
+      console.log("enumMember", node);
+    },
+    exitBoolean: (node) => {
+      console.log("exitBoolean", node);
+    },
+    exitDecorator: (node) => {
+      console.log("exitDecorator", node);
+    },
+    exitEnum: (node) => {
+      console.log("exitEnum", node);
+    },
+    exitEnumMember: (node) => {
+      console.log("exitEnumMember", node);
+    },
+    exitFunction: (node) => {
+      console.log("exitFunction", node);
+    },
+    exitFunctionParameter: (node) => {
+      console.log("exitFunctionParameter", node);
+    },
+    exitInterface: (node) => {
+      console.log("exitInterface", node);
+    },
+    exitIntrinsic: (node) => {
+      console.log("exitIntrinsic", node);
+    },
+    exitModel: (node) => {
+      console.log("exitModel", node);
+    },
+    exitModelProperty: (node) => {
+      console.log("exitModelProperty", node);
+    },
+    exitNamespace: (node) => {
+      console.log("exitNamespace", node);
+    },
+    exitOperation: (node) => {
+      console.log("exitOperation", node);
+    },
+    exitNumber: (node) => {
+      console.log("exitNumber", node);
+    },
+    exitObject: (node) => {
+      console.log("exitObject", node);
+    },
+    exitProjection: (node) => {
+      console.log("exitProjection", node);
+    },
+    exitScalar: (node) => {
+      console.log("exitScalar", node);
+    },
+    exitString: (node) => {
+      console.log("exitString", node);
+    },
+    exitStringTemplate: (node) => {
+      console.log("exitStringTemplate", node);
+    },
+    exitStringTemplateSpan: (node) => {
+      console.log("exitStringTemplateSpan", node);
+    },
+    exitTemplateParameter: (node) => {
+      console.log("exitTemplateParameter", node);
+    },
+    exitTuple: (node) => {
+      console.log("exitTuple", node);
+    },
+    exitUnion: (node) => {
+      console.log("exitUnion", node);
+    },
+    exitUnionVariant: (node) => {
+      console.log("exitUnionVariant", node);
+    },
+    function: (node) => {
+      console.log("function", node);
+    },
+    functionParameter: (node) => {
+      console.log("functionParameter", node);
+    },
+    interface: (node) => {
+      console.log("interface", node);
+    },
+    intrinsic: (node) => {
+      console.log("intrinsic", node);
+    },
+    model: (node) => {
+      console.log("model", node);
+    },
+    modelProperty: (node) => {
+      console.log("modelProperty", node);
+    },
+    namespace: (node) => {
+      console.log("namespace", node);
+    },
+    operation: (node) => {
+      console.log("operation", node);
+    },
+    projection: (node) => {
+      console.log("projection", node);
+    },
+    scalar: (node) => {
+      console.log("scalar", node);
+    },
+    string: (node) => {
+      console.log("string", node);
+    },
+    stringTemplate: (node) => {
+      console.log("stringTemplate", node);
+    },
+    number: (node) => {
+      console.log("number", node);
+    },
+    object: (node) => {
+      console.log("object", node);
+    },
+    root: (node) => {
+      console.log("root", node);
+    },
+    tuple: (node) => {
+      console.log("tuple", node);
+    },
+    stringTemplateSpan: (node) => {
+      console.log("stringTemplateSpan", node);
+    },
+    templateParameter: (node) => {
+      console.log("templateParameter", node);
+    },
+    union: (node) => {
+      console.log("union", node);
+    },
+    unionVariant: (node) => {
+      console.log("unionVariant", node);
+    },
+  });
+}
 
 export async function $onEmit(context: EmitContext<Record<string, never>>) {
   const emitter = createEmitters(context.program, PydanticEmitter, context)[0] as PydanticEmitter;
@@ -240,6 +397,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     scope: Scope<string> | undefined,
     cycle: ReferenceCycle,
   ): string | EmitEntity<string> {
+    console.log(`circularReference: ${target}`);
     if (scope?.kind === "sourceFile" && target.kind === "declaration") {
       const targetName = target.name;
       const targetPath = this.buildNamespaceFromScope(target.scope);
@@ -253,6 +411,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   modelDeclaration(model: Model, name: string): EmitterOutput<string> {
+    console.log(`modelDeclaration: ${model.name}`);
     const builder = new StringBuilder();
     const baseModel = model.baseModel?.name ?? "BaseModel";
     if (baseModel === "BaseModel") {
@@ -267,6 +426,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     } else {
       builder.push(code`${this.indent()}pass`);
     }
+    console.log(`Complete modelDeclaration: ${model.name}`);
     return this.declarations!.declare(this, {
       name: name,
       namespace: model.namespace,
@@ -278,6 +438,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   modelLiteral(model: Model): EmitterOutput<string> {
+    console.log(`modelLiteral: ${model.name}`);
     // Unsupported. See: `anonymous-model` rule
     return code`object`;
   }
@@ -293,6 +454,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   modelInstantiation(model: Model, name: string | undefined): EmitterOutput<string> {
+    console.log(`modelInstantiation: ${model.name}`);
     if (model.name === "Record") {
       const type = model.templateMapper?.args[0];
       this.imports.add("typing", "Dict");
@@ -312,6 +474,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   modelProperties(model: Model): EmitterOutput<string> {
+    console.log(`modelProperties: ${model.name}`);
     const builder = new StringBuilder();
     for (const prop of model.properties.values()) {
       const propResult = this.emitter.emitModelProperty(prop);
@@ -321,6 +484,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   modelPropertyLiteral(property: ModelProperty): EmitterOutput<string> {
+    console.log(`modelPropertyLiteral: ${property.name}`);
     const builder = new StringBuilder();
     const isOptional = property.optional;
     const knownValues = getKnownValues(this.emitter.getProgram(), property);
@@ -374,16 +538,19 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   modelPropertyReference(property: ModelProperty): EmitterOutput<string> {
+    console.log(`modelPropertyReference: ${property.name}`);
     return code`${this.emitTypeReference(property.type)}`;
   }
 
   enumDeclaration(en: Enum, name: string): EmitterOutput<string> {
+    console.log(`enumDeclaration: ${en.name}`);
     const members = this.emitter.emitEnumMembers(en);
     const builder = new StringBuilder();
     this.imports.add("enum", "Enum");
     builder.push(code`class ${name}(Enum):\n`);
     this.emitDocs(builder, en);
     builder.push(code`${members}`);
+    console.log(`Complete enumDeclaration: ${en.name}`);
     return this.declarations!.declare(this, {
       name: name,
       namespace: en.namespace,
@@ -395,6 +562,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   enumMembers(en: Enum): EmitterOutput<string> {
+    console.log(`enumMembers: ${en.name}`);
     const builder = new StringBuilder();
     for (const member of en.members.values()) {
       builder.push(code`${this.indent()}${this.emitter.emitType(member)}\n`);
@@ -403,6 +571,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   enumMember(member: EnumMember): EmitterOutput<string> {
+    console.log(`enumMember: ${member.name}`);
     const builder = new StringBuilder();
     builder.push(code`${this.toSnakeCase(member.name).toUpperCase()}`);
     this.#emitField(builder, member);
@@ -412,11 +581,13 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   enumMemberReference(member: EnumMember): EmitterOutput<string> {
+    console.log(`enumMemberReference: ${member.name}`);
     this.imports.add("typing", "Literal");
     return code`Literal[${member.enum.name}.${this.toSnakeCase(member.name).toUpperCase()}]`;
   }
 
   arrayDeclaration(array: Model, name: string, elementType: Type): EmitterOutput<string> {
+    console.log(`arrayDeclaration: ${array.name} ${(elementType as any).name ?? "anonymous"}`);
     const builder = new StringBuilder();
     this.imports.add("pydantic", "RootModel");
     this.imports.add("typing", "List");
@@ -424,6 +595,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
     builder.push(code`${this.indent()}root: List[${this.emitTypeReference(elementType)}]\n\n`);
     builder.push(code`${this.indent()}def __iter__(self):\n${this.indent(2)}return iter(self.root)\n\n`);
     builder.push(code`${this.indent()}def __getitem__(self, item):\n${this.indent(2)}return self.root[item]\n\n`);
+    console.log(`Complete arrayDeclaration: ${array.name} ${(elementType as any).name ?? "anonymous"}`);
     return this.declarations!.declare(this, {
       name: name,
       namespace: array.namespace,
@@ -432,6 +604,10 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
       omit: false,
       globalImportPath: "models",
     });
+  }
+  arrayLiteral(array: Model, elementType: Type): EmitterOutput<string> {
+    console.log(`arrayLiteral: ${array.name} ${(elementType as any).name ?? "anonymous"}`);
+    return code`List[${this.emitTypeReference(elementType)}]`;
   }
 
   emitScalar(scalar: Scalar, name: string, sourceFile?: SourceFile<string>): string | Placeholder<string> {
@@ -452,6 +628,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   scalarDeclaration(scalar: Scalar, name: string): EmitterOutput<string> {
+    console.log(`scalarDeclaration: ${scalar.name}`);
     // workaround to avoid emitting scalar template declarations
     if (scalar.node.templateParameters.length > 0) {
       return this.emitter.result.none();
@@ -464,6 +641,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
         return code`${converted}`;
       }
     }
+    console.log(`Complete scalarDeclaration: ${scalar.name}`);
     return this.declarations!.declare(this, {
       name: converted,
       namespace: scalar.namespace,
@@ -475,6 +653,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   scalarInstantiation(scalar: Scalar, name: string | undefined): EmitterOutput<string> {
+    console.log(`scalarInstantiation: ${scalar.name}`);
     const converted = this.convertScalarName(scalar, name);
     const code = this.#emitType(converted, scalar);
     return this.declarations!.declare(this, {
@@ -488,6 +667,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   unionDeclaration(union: Union, name: string): EmitterOutput<string> {
+    console.log(`unionDeclaration: ${union.name}`);
     return this.declarations!.declare(this, {
       name: name,
       namespace: union.namespace,
@@ -499,6 +679,7 @@ export class PydanticEmitter extends PythonPartialModelEmitter {
   }
 
   unionInstantiation(union: Union, name: string): EmitterOutput<string> {
+    console.log(`unionInstantiation: ${union.name}`);
     return this.emitter.emitUnionVariants(union);
   }
 }

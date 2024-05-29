@@ -12,10 +12,12 @@ export abstract class PythonPartialModelEmitter extends PythonPartialEmitter {
   }
 
   programContext(program: Program): Context {
+    console.log(`programContext: ${program}`);
     return this.createProgramContext(this.fileName);
   }
 
   namespaceContext(namespace: Namespace): Context {
+    console.log(`namespaceContext: ${namespace.name}`);
     return this.createNamespaceContext(namespace, this.fileName);
   }
 }
