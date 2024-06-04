@@ -12,6 +12,7 @@ import {
   EnumMember,
   Model,
   ModelProperty,
+  Program,
   Scalar,
   Type,
   Union,
@@ -40,6 +41,7 @@ import {
   StringBuilder,
   code,
 } from "@typespec/compiler/emitter-framework";
+import { initEmitterFramework, References, TypeEmitter, Unhandled } from "typespec-efv2";
 
 function navigateProgramDebug(emitter: PydanticEmitter) {
   navigateProgram(emitter.getProgram(), {
@@ -187,23 +189,52 @@ function navigateProgramDebug(emitter: PydanticEmitter) {
   });
 }
 
-export async function $onEmit(context: EmitContext<Record<string, never>>) {
-  const emitter = createEmitters(context.program, PydanticEmitter, context)[0] as PydanticEmitter;
-  emitter.declarations = new DeclarationManager();
-  emitter.emitProgram({ emitTypeSpecNamespace: false });
-  await emitter.writeAllOutput();
-  if (!emitter.getProgram().compilerOptions.noEmit) {
-    for (const sourceFile of emitter.getSourceFiles()) {
-      const initFile = await emitter.buildInitFile(new Map([[sourceFile.path, sourceFile]]));
-      if (initFile !== undefined) {
-        await emitFile(emitter.getProgram(), {
-          path: initFile.path,
-          content: initFile.contents,
-        });
-      }
-    }
-  }
+class MyTypeEmitter implements TypeEmitter<string, Record<string, never>> {
+  context = (_: Program) => {
+    return {};
+  };
+  unhandled: Unhandled = {
+    type: (type: Type) => {
+      return "";
+    },
+    reference: (type: Type) => {
+      return "";
+    },
+  };
+  reference: References = {
+    type: (targetDeclaration, pathUp, pathDown, commonScope) => {
+      return "";
+    },
+    circular: (target, scope, cycle) => {
+      return "";
+    },
+  };
+  model: Models = {};
 }
+
+export async function $onEmit(context: EmitContext<Record<string, never>>) {
+  const ef = initEmitterFramework(context, new MyTypeEmitter());
+  ef.emitProgram();
+  await ef.file.writeAll();
+}
+
+// export async function $onEmit(context: EmitContext<Record<string, never>>) {
+//   const emitter = createEmitters(context.program, PydanticEmitter, context)[0] as PydanticEmitter;
+//   emitter.declarations = new DeclarationManager();
+//   emitter.emitProgram({ emitTypeSpecNamespace: false });
+//   await emitter.writeAllOutput();
+//   if (!emitter.getProgram().compilerOptions.noEmit) {
+//     for (const sourceFile of emitter.getSourceFiles()) {
+//       const initFile = await emitter.buildInitFile(new Map([[sourceFile.path, sourceFile]]));
+//       if (initFile !== undefined) {
+//         await emitFile(emitter.getProgram(), {
+//           path: initFile.path,
+//           content: initFile.contents,
+//         });
+//       }
+//     }
+//   }
+// }
 
 /// Metadata for a Pydantic field.
 interface PydanticFieldMetadata {

@@ -36,6 +36,63 @@ importers:
         specifier: ^5.3.3
         version: 5.3.3
 
+  packages/emitter-framework-v2:
+    devDependencies:
+      '@changesets/cli':
+        specifier: ^2.27.1
+        version: 2.27.1
+      '@types/mocha':
+        specifier: ~10.0.1
+        version: 10.0.6
+      '@types/node':
+        specifier: ~18.11.9
+        version: 18.11.19
+      '@typespec/compiler':
+        specifier: ^0.52.0
+        version: 0.52.0
+      '@typespec/eslint-config-typespec':
+        specifier: ~0.50.0
+        version: 0.50.0(prettier@3.2.5)
+      '@typespec/prettier-plugin-typespec':
+        specifier: ~0.50.0
+        version: 0.50.0
+      cspell:
+        specifier: ^7.3.9
+        version: 7.3.9
+      eslint:
+        specifier: ^8.55.0
+        version: 8.56.0
+      eslint-plugin-import:
+        specifier: ^2.29.0
+        version: 2.29.1(@typescript-eslint/parser@6.21.0)(eslint@8.56.0)
+      mocha:
+        specifier: ~10.2.0
+        version: 10.2.0
+      prettier:
+        specifier: ^3.1.1
+        version: 3.2.5
+      rimraf:
+        specifier: ^5.0.5
+        version: 5.0.5
+      source-map-support:
+        specifier: ^0.5.21
+        version: 0.5.21
+      syncpack:
+        specifier: ^11.2.1
+        version: 11.2.1
+      ts-mocha:
+        specifier: ^10.0.0
+        version: 10.0.0(mocha@10.2.0)
+      ts-node:
+        specifier: 10.9.2
+        version: 10.9.2(@types/node@18.11.19)(typescript@5.3.3)
+      typescript:
+        specifier: ^5.3.3
+        version: 5.3.3
+      typespec-python:
+        specifier: workspace:~1.0.0-beta.1
+        version: link:../typespec-python
+
   packages/playground-website:
     dependencies:
       '@azure-tools/typespec-autorest':
@@ -399,6 +456,10 @@ importers:
         version: link:../typespec-python
 
   packages/typespec-pydantic:
+    dependencies:
+      typespec-efv2:
+        specifier: workspace:~1.0.0-beta.1
+        version: link:../emitter-framework-v2
     devDependencies:
       '@changesets/cli':
         specifier: ^2.27.1
@@ -8173,6 +8234,7 @@ packages:
 
   /rimraf@3.0.2:
     resolution: {integrity: sha512-JZkJMZkAGFFPP2YqXZXPbMlMBgsxzE8ILs4lMIX/2o0L9UBw9O/Y3o6wFw/i9YLapcUJWwqbi3kdxIPdC62TIA==}
+    deprecated: Rimraf versions prior to v4 are no longer supported
     hasBin: true
     dependencies:
       glob: 7.2.3
